@@ -11,12 +11,19 @@ class BrokerConfig(BaseSettings):
         env_file_encoding = "utf-8"
 
 class StockMarketConfig(BaseSettings):
-    index_name: str = Field("IMOEX")
+    index_name: str = "IMOEX"
     limit: int = 100
     base_url: str = "https://iss.moex.com/iss"
+
+class BalancerConfig(BaseSettings):
+    delta: float = 0.05
+    commission: float = 0.003
+    min_lots_to_keep: int = 1
+
 
 class Settings:
     broker: BrokerConfig = BrokerConfig()
     stock_market: StockMarketConfig = StockMarketConfig()
+    balancer: BalancerConfig = BalancerConfig()
 
 settings = Settings()
