@@ -10,11 +10,13 @@ class BrokerConfig(BaseSettings):
         env_file = ".env"
         env_file_encoding = "utf-8"
 
-class StockConfig(BaseSettings):
+class StockMarketConfig(BaseSettings):
     index_name: str = Field("IMOEX")
+    limit: int = 100
+    base_url: str = "https://iss.moex.com/iss"
 
 class Settings:
     broker: BrokerConfig = BrokerConfig()
-    stock: StockConfig = StockConfig()
+    stock_market: StockMarketConfig = StockMarketConfig()
 
 settings = Settings()
