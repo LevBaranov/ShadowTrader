@@ -72,18 +72,6 @@ class Balancer:
                     'over': 1
                 })
             df = pd.concat([df, pd.DataFrame(rows)], ignore_index=True)
-        # for ticker in portfolio_dataframe.index:
-        #     if ticker not in index_dataframe.index:
-        #         df = pd.concat([df, pd.DataFrame([{
-        #             'ticker': ticker,
-        #             'weight': 0,
-        #             'target_weight': 0,
-        #             'lot_size': portfolio_dataframe.at[ticker, 'lot_size'],
-        #             'last_price': portfolio_dataframe.at[ticker, 'last_price'],
-        #             'current_weight': current_weights.get(ticker, 0),
-        #             'ratio': 1,  # Высокий приоритет на продажу
-        #             'over': 1
-        #         }])], ignore_index=True)
 
         # Сортируем тикеры
         df.sort_values(by=['over', 'ratio', 'target_weight'],
