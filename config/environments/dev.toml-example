@@ -1,0 +1,19 @@
+[telegram]
+token=".."
+
+[broker]
+token = ".."
+sandbox_mode = true
+
+[stock_market]
+index_name = "IMOEX"
+limit = 100
+base_url = "https://iss.moex.com/iss"
+
+[balancer]
+delta = 0.05
+commission = 0.003
+min_lots_to_keep = 1
+
+[[users]]
+telegram_id = 12345678

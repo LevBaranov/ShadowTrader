@@ -10,7 +10,7 @@ from models.error import Error
 from services.broker import TBroker, TAccount
 from services.stock_market import Moex
 
-from balancer import Balancer
+from core.balancer import Balancer
 
 
 class PortfolioManager:
@@ -19,10 +19,13 @@ class PortfolioManager:
     рассчитывает что нужно сделать для балансировки
     """
 
-    def __init__(self):
+    def __init__(self, account_id: str = None):
         self.actions: List[Action] = []
         self.broker = TBroker()
-        self.account_client: Optional[TAccount] = None
+        if account_id:
+            self.set_account(account_id)
+        else:
+            self.account_client: Optional[TAccount] = None
         self._index_cache: Dict[Tuple[str, datetime.date], Index] = {}
         self.moex = Moex()
 
@@ -33,23 +36,26 @@ class PortfolioManager:
         """
         return self.broker.get_all_accounts()
 
-    def set_account(self, account: Account) -> None:
+    def set_account(self, account_id: str) -> None:
         """
         Установка текущего аккаунта для работы
-        :param account: Аккаунт пользователя
+        :param account_id: Идентификатор аккаунта пользователя в формате uuid
         :return:
         """
-        self.account_client = TAccount(account.id, self.broker)
+        self.account_client = TAccount(account_id, self.broker)
         self.actions = []
 
-    def get_portfolio(self, account: Account) -> Positions:
+    def get_portfolio(self, account_id: str = None) -> Positions:
         """
         Вернуть текущие позиции по аккаунту
-        :param account: Аккаунт пользователя
+        :param account_id: Идентификатор аккаунта пользователя в формате uuid
         :return: Открытые позиции
         """
-        if not self.account_client or self.account_client.account_id != account.id:
-            self.set_account(account)
+        if not self.account_client:
+            if account_id and self.account_client.account_id != account_id:
+                self.set_account(account.id)
+            else:
+                raise ValueError("Account client is not initialized")
         return self.account_client.get_positions()
 
     def get_index_list(self, index_name: str) -> Index:
@@ -108,7 +114,7 @@ if __name__ == "__main__":
 
     account = manager.get_user_accounts()[0]
 
-    portfolio = manager.get_portfolio(account)
+    portfolio = manager.get_portfolio(account.id)
     pprint.pprint(portfolio)
     index_moex = manager.get_index_list("IMOEX")
 
