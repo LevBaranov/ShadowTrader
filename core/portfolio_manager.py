@@ -52,10 +52,12 @@ class PortfolioManager:
         :return: Открытые позиции
         """
         if not self.account_client:
-            if account_id and self.account_client.account_id != account_id:
-                self.set_account(account.id)
-            else:
-                raise ValueError("Account client is not initialized")
+            if not account_id:
+                raise ValueError("Account client is not initialized and account_id is not provided")
+            self.set_account(account_id)
+        elif account_id and self.account_client.account_id != account_id:
+            self.set_account(account_id)
+
         return self.account_client.get_positions()
 
     def get_index_list(self, index_name: str) -> Index:
@@ -119,7 +121,8 @@ if __name__ == "__main__":
     index_moex = manager.get_index_list("IMOEX")
 
     actions, cash = manager.get_action_for_rebalance(portfolio, index_moex)
-    print(f"{actions, cash}")
+    pprint.pprint(actions)
+    pprint.pprint(cash)
 
-    success_action_list, error_action_list = manager.execute_actions()
-    print(f"{success_action_list, error_action_list}")
+    # success_action_list, error_action_list = manager.execute_actions()
+    # print(f"{success_action_list, error_action_list}")

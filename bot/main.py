@@ -1,6 +1,8 @@
 import asyncio
 import logging
 from aiogram import Bot, Dispatcher
+from aiogram.fsm.storage.memory import MemoryStorage
+
 
 import handlers, callbacks
 
@@ -9,7 +11,7 @@ from config import settings
 async def main():
     telegram_token = settings.telegram.token
     bot = Bot(token=telegram_token)
-    dp = Dispatcher()
+    dp = Dispatcher(storage=MemoryStorage())
     dp.include_routers(handlers.router, callbacks.router)
 
     await bot.delete_webhook(drop_pending_updates=True)
