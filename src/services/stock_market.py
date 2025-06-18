@@ -1,9 +1,9 @@
 import requests
 
-from models.index import Index, IndexItem
-from models.error import Error
+from src.models.index import Index, IndexItem
+from src.models.error import Error
 
-from config import settings
+from src.config import settings
 
 class Moex:
     """

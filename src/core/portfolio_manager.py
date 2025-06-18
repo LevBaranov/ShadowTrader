@@ -1,16 +1,16 @@
 import datetime
 from typing import List, Tuple, Dict, Optional
 
-from models.action import Action
-from models.positions import Positions
-from models.account import Account
-from models.index import Index
-from models.error import Error
+from src.models.action import Action
+from src.models.positions import Positions
+from src.models.account import Account
+from src.models.index import Index
+from src.models.error import Error
 
-from services.broker import TBroker, TAccount
-from services.stock_market import Moex
+from src.services.broker import TBroker, TAccount
+from src.services.stock_market import Moex
 
-from core.balancer import Balancer
+from src.core.balancer import Balancer
 
 
 class PortfolioManager:

@@ -4,12 +4,12 @@ from aiogram import Router, F
 from aiogram.types import CallbackQuery
 from aiogram.fsm.context import FSMContext
 
-from core.portfolio_manager import PortfolioManager
+from src.core.portfolio_manager import PortfolioManager
 
-from bot.utils import AccountCallbackFactory, PortfolioRebalanceState, ActionsCallbackFactory, get_actions_keys
-from bot.texts import action, free_cash, position, success, error_text, errors
+from src.bot.utils import AccountCallbackFactory, PortfolioRebalanceState, ActionsCallbackFactory, get_actions_keys
+from src.bot.texts import action, free_cash, position, success, error_text, errors
 
-from config import settings
+from src.config import settings
 
 router = Router()
 router.callback_query.filter(F.from_user.id.in_([user.telegram_id for user in settings.users]))

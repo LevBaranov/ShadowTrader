@@ -6,7 +6,7 @@ from aiogram.fsm.storage.memory import MemoryStorage
 
 import handlers, callbacks
 
-from config import settings
+from src.config import settings
 
 async def main():
     telegram_token = settings.telegram.token

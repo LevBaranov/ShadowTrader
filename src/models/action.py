@@ -1,6 +1,6 @@
 from dataclasses import dataclass
 
-from models.share import Share
+from src.models.share import Share
 
 
 @dataclass()

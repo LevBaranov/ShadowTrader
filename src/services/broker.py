@@ -6,12 +6,12 @@ from dataclasses import asdict
 from tinkoff.invest import Client, OrderDirection, OrderType, RequestError
 from tinkoff.invest.constants import INVEST_GRPC_API_SANDBOX
 
-from config import settings
-from models.account import Account
-from models.positions import Positions, PositionsShare, PositionsCash, Cash
-from models.share import Share, ShareList
-from models.action import Action
-from models.error import Error
+from src.config import settings
+from src.models.account import Account
+from src.models.positions import Positions, PositionsShare, PositionsCash, Cash
+from src.models.share import Share, ShareList
+from src.models.action import Action
+from src.models.error import Error
 
 from functools import wraps
 import time
@@ -185,7 +185,6 @@ class TAccount:
 
 
 if __name__ == "__main__":
-    import os
     import pprint
 
 

@@ -1,0 +1,85 @@
+{
+"analytics": {
+	"metadata": {
+		"indexid": {"type": "string", "bytes": 36, "max_size": 0},
+		"tradedate": {"type": "date", "bytes": 10, "max_size": 0},
+		"ticker": {"type": "string", "bytes": 36, "max_size": 0},
+		"shortnames": {"type": "string", "bytes": 189, "max_size": 0},
+		"secids": {"type": "string", "bytes": 36, "max_size": 0},
+		"weight": {"type": "double"},
+		"tradingsession": {"type": "int32"}
+	},
+	"columns": ["indexid", "tradedate", "ticker", "shortnames", "secids", "weight", "tradingsession"],
+	"data": [
+		["IMOEX", "2025-06-17", "AFKS", "Система ао", "AFKS", 0.46, 3],
+		["IMOEX", "2025-06-17", "AFLT", "Аэрофлот", "AFLT", 0.83, 3],
+		["IMOEX", "2025-06-17", "ALRS", "АЛРОСА ао", "ALRS", 0.73, 3],
+		["IMOEX", "2025-06-17", "ASTR", "Астра ао", "ASTR", 0.2, 3],
+		["IMOEX", "2025-06-17", "BSPB", "БСП ао", "BSPB", 0.42, 3],
+		["IMOEX", "2025-06-17", "CBOM", "МКБ ао", "CBOM", 0.52, 3],
+		["IMOEX", "2025-06-17", "CHMF", "СевСт-ао", "CHMF", 1.28, 3],
+		["IMOEX", "2025-06-17", "ENPG", "ЭН+ГРУП ао", "ENPG", 0.33, 3],
+		["IMOEX", "2025-06-17", "FEES", "Россети", "FEES", 0.24, 3],
+		["IMOEX", "2025-06-17", "FLOT", "Совкомфлот", "FLOT", 0.33, 3],
+		["IMOEX", "2025-06-17", "GAZP", "ГАЗПРОМ ао", "GAZP", 12.11, 3],
+		["IMOEX", "2025-06-17", "GMKN", "ГМКНорНик", "GMKN", 3.39, 3],
+		["IMOEX", "2025-06-17", "HEAD", "Хэдхантер", "HEAD", 0.97, 3],
+		["IMOEX", "2025-06-17", "HYDR", "РусГидро", "HYDR", 0.2, 3],
+		["IMOEX", "2025-06-17", "IRAO", "ИнтерРАОао", "IRAO", 1.19, 3],
+		["IMOEX", "2025-06-17", "LKOH", "ЛУКОЙЛ", "LKOH", 14.71, 3],
+		["IMOEX", "2025-06-17", "MAGN", "ММК", "MAGN", 0.7, 3],
+		["IMOEX", "2025-06-17", "MDMG", "MDMG-ао", "MDMG", 0.29, 3],
+		["IMOEX", "2025-06-17", "MOEX", "МосБиржа", "MOEX", 1.33, 3],
+		["IMOEX", "2025-06-17", "MSNG", "+МосЭнерго", "MSNG", 0.26, 3],
+		["IMOEX", "2025-06-17", "MTLR", "Мечел ао", "MTLR", 0.15, 3],
+		["IMOEX", "2025-06-17", "MTSS", "МТС-ао", "MTSS", 1.19, 3],
+		["IMOEX", "2025-06-17", "NLMK", "НЛМК ао", "NLMK", 1.14, 3],
+		["IMOEX", "2025-06-17", "NVTK", "Новатэк ао", "NVTK", 4.38, 3],
+		["IMOEX", "2025-06-17", "PHOR", "ФосАгро ао", "PHOR", 0.68, 3],
+		["IMOEX", "2025-06-17", "PIKK", "ПИК ао", "PIKK", 1.27, 3],
+		["IMOEX", "2025-06-17", "PLZL", "Полюс", "PLZL", 3.34, 3],
+		["IMOEX", "2025-06-17", "POSI", "iПозитив", "POSI", 0.28, 3],
+		["IMOEX", "2025-06-17", "RENI", "Ренессанс", "RENI", 0.28, 3],
+		["IMOEX", "2025-06-17", "ROSN", "Роснефть", "ROSN", 3.4, 3],
+		["IMOEX", "2025-06-17", "RTKM", "Ростел -ао", "RTKM", 0.59, 3],
+		["IMOEX", "2025-06-17", "RUAL", "РУСАЛ ао", "RUAL", 0.94, 3],
+		["IMOEX", "2025-06-17", "SBER", "Сбербанк", "SBER", 14.77, 3],
+		["IMOEX", "2025-06-17", "SBERP", "Сбербанк-п", "SBERP", 2.83, 3],
+		["IMOEX", "2025-06-17", "SELG", "Селигдар", "SELG", 0.18, 3],
+		["IMOEX", "2025-06-17", "SNGS", "Сургнфгз", "SNGS", 2.28, 3],
+		["IMOEX", "2025-06-17", "SNGSP", "Сургнфгз-п", "SNGSP", 2.31, 3],
+		["IMOEX", "2025-06-17", "SVCB", "Совкомбанк", "SVCB", 0.52, 3],
+		["IMOEX", "2025-06-17", "T", "Т-Техно ао", "T", 5.45, 3],
+		["IMOEX", "2025-06-17", "TATN", "Татнфт 3ао", "TATN", 5.93, 3],
+		["IMOEX", "2025-06-17", "TATNP", "Татнфт 3ап", "TATNP", 1.04, 3],
+		["IMOEX", "2025-06-17", "TRNFP", "Транснф ап", "TRNFP", 0.49, 3],
+		["IMOEX", "2025-06-17", "UGLD", "ЮГК", "UGLD", 0.23, 3],
+		["IMOEX", "2025-06-17", "UPRO", "Юнипро ао", "UPRO", 0.2, 3],
+		["IMOEX", "2025-06-17", "VKCO", "МКПАО \"ВК\"", "VKCO", 0.36, 3],
+		["IMOEX", "2025-06-17", "VTBR", "ВТБ ао", "VTBR", 1.45, 3],
+		["IMOEX", "2025-06-17", "YDEX", "ЯНДЕКС", "YDEX", 3.83, 3]
+	]
+},
+"analytics.cursor": {
+	"metadata": {
+		"INDEX": {"type": "int64"},
+		"TOTAL": {"type": "int64"},
+		"PAGESIZE": {"type": "int64"},
+		"PREV_DATE": {"type": "string", "bytes": 30, "max_size": 0},
+		"NEXT_DATE": {"type": "undefined", "bytes": 0, "max_size": 0}
+	},
+	"columns": ["INDEX", "TOTAL", "PAGESIZE", "PREV_DATE", "NEXT_DATE"],
+	"data": [
+		[0, 47, 100, "2025-06-16", null]
+	]
+},
+"analytics.dates": {
+	"metadata": {
+		"from": {"type": "date", "bytes": 30, "max_size": 0},
+		"till": {"type": "date", "bytes": 30, "max_size": 0}
+	},
+	"columns": ["from", "till"],
+	"data": [
+		["2001-01-03", "2025-06-17"]
+	]
+}}

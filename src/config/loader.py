@@ -1,7 +1,7 @@
 import os
 import toml
 from pathlib import Path
-from config.base import AppConfig
+from src.config.base import AppConfig
 
 ENV = os.getenv("APP_ENV", "prod")
 CONFIG_PATH = Path(__file__).parent / "environments" / f"{ENV}.toml"

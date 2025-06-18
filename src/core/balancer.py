@@ -1,10 +1,10 @@
 import pandas as pd
-from typing import List, Tuple, Dict, Optional
+from typing import List, Tuple, Dict
 
-from models.positions import Positions
-from models.index import Index
+from src.models.positions import Positions
+from src.models.index import Index
 
-from config import settings
+from src.config import settings
 
 
 class Balancer:

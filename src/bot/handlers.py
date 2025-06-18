@@ -5,12 +5,12 @@ from aiogram import Router, F
 from aiogram.types import Message
 from aiogram.filters import Command
 
-from core.portfolio_manager import PortfolioManager
+from src.core.portfolio_manager import PortfolioManager
 
-from bot.texts import welcome
-from bot.utils import get_accounts_keys
+from src.bot.texts import welcome
+from src.bot.utils import get_accounts_keys
 
-from config import settings
+from src.config import settings
 
 router = Router()
 router.message.filter(F.chat.id.in_([user.telegram_id for user in settings.users]))

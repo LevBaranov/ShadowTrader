@@ -4,7 +4,7 @@ from aiogram.filters.callback_data import CallbackData
 from aiogram.fsm.state import StatesGroup, State
 
 
-from models.account import Account
+from src.models.account import Account
 
 class AccountCallbackFactory(CallbackData, prefix="account"):
     action: str
