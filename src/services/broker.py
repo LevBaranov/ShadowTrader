@@ -13,31 +13,7 @@ from src.models.share import Share, ShareList
 from src.models.action import Action
 from src.models.error import Error
 
-from functools import wraps
-import time
-
-def cache_data(ttl_seconds: int):
-    """Декоратор для кэширования вызова метода с TTL."""
-    def decorator(func):
-        cache = None
-        last_update = 0
-
-        @wraps(func)
-        def wrapper(self, *args, **kwargs):
-            nonlocal cache, last_update
-
-            current_time = time.time()
-            if cache is not None and (current_time - last_update) < ttl_seconds:
-                return cache
-
-            print(f"Обновляю кэш в {func.__name__}...")
-            cache = func(self, *args, **kwargs)
-            last_update = current_time
-            return cache
-        return wrapper
-    return decorator
-
-
+from src.services.utils import cache_data, log_response
 
 class TBroker:
     """
@@ -70,6 +46,7 @@ class TBroker:
 
         return [Account(id=a.id, name=a.name) for a in accounts]
 
+    @log_response()
     @cache_data(ttl_seconds=86400)
     def get_all_shares(self) -> ShareList:
         """
@@ -79,7 +56,6 @@ class TBroker:
         shares = []
         with self.get_client() as client:
             instruments = client.instruments
-
             shares = [
                 Share(f.uid, f.figi, f.ticker, f.lot, f.isin)
                 for f in instruments.shares().instruments if f.currency == 'rub'
@@ -91,6 +67,7 @@ class TBroker:
         return ShareList(shares)
 
 
+    @log_response()
     def find_share(self, value: str, field: str = "uid") -> Optional[Share]:
         """
         Метод для поиска информации об акции. Может принимать на вход uid или ticker
@@ -102,9 +79,17 @@ class TBroker:
             "ticker": self._shares_by_ticker,
             "uid": self._shares_by_uid
         }
-        if not lookup_maps.get(field, {}).get(value):
+        result = lookup_maps.get(field, {}).get(value)
+        if not result:
             self.get_all_shares()
-        return lookup_maps.get(field, {}).get(value)
+            # пересоздаём lookup_maps, так как словари могли обновиться
+            lookup_maps = {
+                "ticker": self._shares_by_ticker,
+                "uid": self._shares_by_uid
+            }
+            result = lookup_maps.get(field, {}).get(value)
+
+        return result
 
 
 class TAccount:
@@ -189,6 +174,7 @@ if __name__ == "__main__":
 
 
     br = TBroker()
+    print(br.find_share("SBER", "ticker"))
     pprint.pprint(br.get_all_shares())
     accs = br.get_all_accounts()
     print(accs)

@@ -5,6 +5,7 @@ from typing import Optional, Dict, List
 class BrokerConfig(BaseModel):
     token: str
     sandbox_mode: bool = True
+    log_file: str
 
 
 class StockMarketConfig(BaseModel):
@@ -27,10 +28,16 @@ class UserConfig(BaseModel):
     telegram_id: int
 
 
+class LoggingConfig(BaseModel):
+    enabled: bool = True
+    path: str
+
+
 class AppConfig(BaseModel):
     telegram: TelegramConfig
     broker: BrokerConfig
     stock_market: StockMarketConfig
     balancer: BalancerConfig
     users: List[UserConfig] = []
+    logging: LoggingConfig
 
