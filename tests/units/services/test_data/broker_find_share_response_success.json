@@ -1,0 +1,29 @@
+[
+  {
+  "name": "find_share",
+  "request": {
+    "value": "SBER",
+    "field": "ticker"
+  },
+  "response": {
+    "uid": "e6123145-9665-43e0-8413-cd61b8aa9b13",
+    "figi": "BBG004730N88",
+    "ticker": "SBER",
+    "lot_size": 10,
+    "isin": "RU0009029540"
+  }
+},{
+  "name": "find_share",
+  "request": {
+    "value": "1e19953d-01c6-4ecd-a5f4-53ae3ed44029",
+    "field": "uid"
+  },
+  "response": {
+    "uid": "1e19953d-01c6-4ecd-a5f4-53ae3ed44029",
+    "figi": "BBG000QJW156",
+    "ticker": "BSPB",
+    "lot_size": 10,
+    "isin": "RU0009100945"
+  }
+}
+]

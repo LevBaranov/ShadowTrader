@@ -9,3 +9,6 @@ class Error(Exception):
     source_data: Any
     data: Any
     description: Optional[str] = None
+
+    def __str__(self):
+        return f"{self.source}: {self.description}"
