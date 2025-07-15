@@ -46,7 +46,7 @@ async def callbacks_account(
         manager = PortfolioManager(account_id)
         portfolio = manager.get_portfolio()
 
-        index_moex = manager.get_index_list(settings.stock_market.index_name)
+        index_moex = manager.get_index_list(user.links.index_name)
         actions, cash = manager.get_action_for_rebalance(portfolio, index_moex)
 
         await portfolio_structure_message(callback.message, portfolio)
