@@ -11,18 +11,18 @@ class TestTBroker:
         with open(os.path.join("test_data", filename), "r") as f:
             return json.load(f)
 
-    @pytest.fixture(autouse=True)
-    def disable_cache(self, monkeypatch):
-        """Фикстура для отключения кэширования во всех тестах класса"""
-
-        def no_cache_decorator(ttl_seconds):
-            def decorator(func):
-                return func
-
-            return decorator
-
-        # Подменяем ДО любого импорта TBroker
-        monkeypatch.setattr("src.services.utils.cache_data", no_cache_decorator)
+    # @pytest.fixture(autouse=True)
+    # def disable_cache(self, monkeypatch):
+    #     """Фикстура для отключения кэширования во всех тестах класса"""
+    #
+    #     def no_cache_decorator(ttl_seconds):
+    #         def decorator(func):
+    #             return func
+    #
+    #         return decorator
+    #
+    #     # Подменяем ДО любого импорта TBroker
+    #     monkeypatch.setattr("src.services.utils.cache_data", no_cache_decorator)
 
     def test_init_with_default_settings(self):
         from src.config import settings

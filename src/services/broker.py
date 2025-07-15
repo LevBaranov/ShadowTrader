@@ -47,7 +47,7 @@ class TBroker:
         return [Account(id=a.id, name=a.name) for a in accounts]
 
     @log_response()
-    @cache_data(ttl_seconds=86400)
+    # @cache_data(ttl_seconds=86400)
     def get_all_shares(self) -> ShareList:
         """
         Возвращает список акций с их дополнительной информацией.
