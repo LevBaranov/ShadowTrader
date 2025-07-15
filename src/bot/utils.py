@@ -1,36 +1,29 @@
-from typing import List
-from aiogram.utils.keyboard import InlineKeyboardBuilder
+
 from aiogram.filters.callback_data import CallbackData
 from aiogram.fsm.state import StatesGroup, State
-
-
-from src.models.account import Account
+from src.config import settings
 
 class AccountCallbackFactory(CallbackData, prefix="account"):
     action: str
-    value: str
+    account_id: str
+
+class BalanceActionsCallbackFactory(CallbackData, prefix="balance_actions"):
+    action: str
 
 class ActionsCallbackFactory(CallbackData, prefix="actions"):
     action: str
 
-def get_accounts_keys(accounts: List[Account]):
-    builder = InlineKeyboardBuilder()
-    for account in accounts:
-        account_name = account.name if account.name else "Без названия"
-        builder.button(
-            text=account_name, callback_data=AccountCallbackFactory(action="set_account", value=account.id)
-        )
-    builder.adjust(2)
-    return builder.as_markup()
-
-def get_actions_keys():
-    builder = InlineKeyboardBuilder()
-    builder.button(
-        text="Выполнить все действия", callback_data=ActionsCallbackFactory(action="execute")
-    )
-
-    builder.adjust(2)
-    return builder.as_markup()
 
 class PortfolioRebalanceState(StatesGroup):
     get_actions = State()
+
+def check_links_exist(user_id: int):
+    user = [ user for user in settings.users if user.telegram_id == user_id]
+
+    if (user[0].links
+            and user[0].links.index_name
+            and user[0].links.broker_account_id
+            and user[0].links.broker_account_name):
+        return user[0].links
+    else:
+        return None

@@ -23,9 +23,14 @@ class BalancerConfig(BaseModel):
 class TelegramConfig(BaseModel):
     token: str
 
+class UserLinksConfig(BaseModel):
+    broker_account_id: str
+    broker_account_name: str
+    index_name: str
 
 class UserConfig(BaseModel):
     telegram_id: int
+    links: UserLinksConfig = None
 
 
 class LoggingConfig(BaseModel):
