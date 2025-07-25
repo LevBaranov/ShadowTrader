@@ -192,7 +192,7 @@ class Balancer:
                 break
 
         self.actions = self.optimize_actions()
-        return self.actions, self.free_cash
+        return self.actions, float(self.free_cash)
 
 
 

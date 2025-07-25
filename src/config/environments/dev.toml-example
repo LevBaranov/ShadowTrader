@@ -4,6 +4,7 @@ token=".."
 [broker]
 token = ".."
 sandbox_mode = true
+log_file = "broker.jsonl"
 
 [stock_market]
 index_name = "IMOEX"
@@ -14,6 +15,23 @@ base_url = "https://iss.moex.com/iss"
 delta = 0.05
 commission = 0.003
 min_lots_to_keep = 1
+max_cash = 2000
 
 [[users]]
 telegram_id = 12345678
+
+[users.links]
+broker_account_id = "2000000000"
+broker_account_name = "Name"
+index_name = "IMOEX"
+
+[users.schedule]
+last_run = 2025-07-25T17:47:27.927476
+rebalance_frequency = "MONTHLY"
+
+[logging]
+enabled = true
+path = "logs/"
+
+[scheduler]
+timeout_in_sec = 20

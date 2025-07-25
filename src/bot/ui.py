@@ -4,8 +4,10 @@ from aiogram.types import Message
 
 from string import Template
 from src.bot.texts import welcome_user, welcome_guest, free_cash, position, action, success, error_text, errors
-
+from src.bot.texts import change_scheduler
 from src.bot.utils import AccountCallbackFactory, BalanceActionsCallbackFactory, ActionsCallbackFactory
+from src.bot.utils import ScheduleCallbackFactory
+from src.bot.scheduler import ScheduleFrequency
 from src.config.base import UserLinksConfig
 from src.models.account import Account
 from src.models.positions import Positions
@@ -43,6 +45,20 @@ def get_actions_keys():
         text="Изменить привязку", callback_data=ActionsCallbackFactory(action="relinked")
     )
 
+    builder.adjust(2)
+    return builder.as_markup()
+
+
+def get_scheduler_keys():
+    builder = InlineKeyboardBuilder()
+    for period in ScheduleFrequency:
+        builder.button(
+            text=period.value, callback_data=ScheduleCallbackFactory(frequency=period.name)
+        )
+
+    builder.button(
+        text="Никогда", callback_data=ScheduleCallbackFactory(frequency="NEVER")
+    )
     builder.adjust(2)
     return builder.as_markup()
 
@@ -95,5 +111,8 @@ async def actions_result_message(message: Message, success_action_list: List[Act
     mes = f"{success_message}\n{error_message}"
     await message.answer(mes)
 
+async def change_scheduler_message(message: Message):
+
+    await message.answer(change_scheduler, reply_markup=get_scheduler_keys())
 
 #endregion Message

@@ -1,5 +1,3 @@
-from string import Template
-
 from aiogram import Router, F
 from aiogram.types import CallbackQuery
 from aiogram.fsm.context import FSMContext
@@ -7,9 +5,11 @@ from aiogram.fsm.context import FSMContext
 from src.core.portfolio_manager import PortfolioManager
 
 from src.bot.utils import AccountCallbackFactory, ActionsCallbackFactory, BalanceActionsCallbackFactory
-from src.bot.utils import PortfolioRebalanceState
-from src.bot.ui import (actions_list_message, actions_result_message, welcome_user_answer,
-                        change_user_links_answer, portfolio_structure_message)
+from src.bot.utils import ScheduleCallbackFactory
+from src.bot.utils import PortfolioRebalanceState, get_actions_list
+
+from src.bot.ui import actions_list_message, actions_result_message, welcome_user_answer
+from src.bot.ui import change_user_links_answer, portfolio_structure_message, change_scheduler_message
 
 from src.config import settings, ConfigLoader
 
@@ -29,9 +29,20 @@ async def callbacks_account(
 
     ConfigLoader.add_link(callback.from_user.id, account_id, account[0].name)
     updated_settings = ConfigLoader.config
-    await welcome_user_answer(callback.message, updated_settings.users[0].links)
+    await change_scheduler_message(callback.message)
     await callback.answer()
 
+
+@router.callback_query(ScheduleCallbackFactory.filter())
+async def callbacks_account(
+        callback: CallbackQuery,
+        callback_data: ScheduleCallbackFactory
+):
+
+    ConfigLoader.update_schedule(callback.from_user.id, callback_data.frequency)
+    updated_settings = ConfigLoader.config
+    await welcome_user_answer(callback.message, settings.users[0].links)
+    await callback.answer()
 
 
 @router.callback_query(ActionsCallbackFactory.filter())
@@ -44,10 +55,7 @@ async def callbacks_account(
     if callback_data.action == "rebalance":
         account_id = user.links.broker_account_id
         manager = PortfolioManager(account_id)
-        portfolio = manager.get_portfolio()
-
-        index_moex = manager.get_index_list(user.links.index_name)
-        actions, cash = manager.get_action_for_rebalance(portfolio, index_moex)
+        portfolio, actions, cash = get_actions_list(manager, user.links.index_name)
 
         await portfolio_structure_message(callback.message, portfolio)
         await state.update_data(manager=manager)

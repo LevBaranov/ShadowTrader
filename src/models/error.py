@@ -11,4 +11,4 @@ class Error(Exception):
     description: Optional[str] = None
 
     def __str__(self):
-        return f"{self.source}: {self.description}"
+        return f"{self.source}: {self.description}. Source Data: {self.source_data}"

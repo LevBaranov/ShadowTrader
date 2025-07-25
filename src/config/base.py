@@ -1,5 +1,6 @@
 from pydantic import BaseModel
 from typing import Optional, Dict, List
+from datetime import datetime
 
 
 class BrokerConfig(BaseModel):
@@ -18,24 +19,37 @@ class BalancerConfig(BaseModel):
     delta: float = 0.05
     commission: float = 0.003
     min_lots_to_keep: int = 1
+    max_cash: int
 
 
 class TelegramConfig(BaseModel):
     token: str
+
 
 class UserLinksConfig(BaseModel):
     broker_account_id: str
     broker_account_name: str
     index_name: str
 
+
+class UserScheduleConfig(BaseModel):
+    last_run: datetime = None
+    rebalance_frequency: str = None
+
+
 class UserConfig(BaseModel):
     telegram_id: int
     links: UserLinksConfig = None
+    schedule: UserScheduleConfig = None
 
 
 class LoggingConfig(BaseModel):
     enabled: bool = True
     path: str
+
+
+class SchedulerConfig(BaseModel):
+    timeout_in_sec: int
 
 
 class AppConfig(BaseModel):
@@ -45,4 +59,5 @@ class AppConfig(BaseModel):
     balancer: BalancerConfig
     users: List[UserConfig] = []
     logging: LoggingConfig
+    scheduler: SchedulerConfig
 

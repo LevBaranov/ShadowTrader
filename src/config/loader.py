@@ -1,7 +1,8 @@
 import os
 import toml
 from pathlib import Path
-from src.config.base import AppConfig, UserLinksConfig
+from src.config.base import AppConfig, UserLinksConfig, UserScheduleConfig
+from datetime import datetime
 
 ENV = os.getenv("APP_ENV", "prod")
 CONFIG_PATH = Path(__file__).parent / "environments" / f"{ENV}.toml"
@@ -35,4 +36,17 @@ class ConfigLoader:
                 )
         cls.save()
 
-
+    @classmethod
+    def update_schedule(cls,
+                 user_id: int,
+                 rebalance_frequency: str,
+                 last_run: datetime = None):
+        if not last_run:
+            last_run = datetime.now()
+        for user in cls.config.users:
+            if user.telegram_id == user_id:
+                user.schedule=UserScheduleConfig(
+                    last_run=last_run,
+                    rebalance_frequency=rebalance_frequency
+                )
+        cls.save()
