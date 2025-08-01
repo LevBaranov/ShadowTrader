@@ -27,6 +27,7 @@ class PortfolioManager:
         else:
             self.account_client: Optional[TAccount] = None
         self._index_cache: Dict[Tuple[str, datetime.date], Index] = {}
+        self._indices_cache: Dict[datetime.date, List[Tuple[str, str]]] = {}
         self.moex = Moex()
 
     def get_user_accounts(self) -> List[Account]:
@@ -72,6 +73,17 @@ class PortfolioManager:
             idx = self.moex.get_index_list(index_name)
             self._index_cache[cache_key] = idx
         return self._index_cache[cache_key]
+
+    def get_indices_list(self) -> List[Tuple[str, str]]:
+        """
+        Получить список индексов, кешируя результат на день
+        :return: Список: Индекс, краткое название
+        """
+        today = datetime.date.today()
+        if today not in self._indices_cache:
+            idx = self.moex.get_indices()
+            self._indices_cache[today] = idx
+        return self._indices_cache[today]
 
     def get_action_for_rebalance(self, portfolio: Positions, index: Index)-> Tuple[List[Action], float]:
         """

@@ -90,9 +90,31 @@ class Moex:
 
         return index
 
+    def get_indices(self) -> list[tuple[str, str]]:
+        """
+        Возвращает список индексов для отслеживания.
+        :return: Список (Индекс, Короткое человеко читаемое название индекса).
+        """
+
+        url = f"{self.base_url}/securitygroups/stock_index/collections/stock_index_shares/securities.json"
+        params = {
+            "limit": self.limit,
+            "start": 0,
+            "securities.columns": "SECID, SHORTNAME, IS_TRADED"
+        }
+        data = self._fetch_json(url, params)
+        result = []
+        for indexid, shortname, is_traded in data.get("securities", {}).get("data", []):
+
+            if is_traded > 0:
+                result.append((indexid, shortname,))
+
+        return result
+
+
 
 if __name__ == "__main__":
     m = Moex()
-    index_moex = m.get_index_list("IMOEX")
+    index_moex = m.get_indices()
     print(index_moex)
-    print(index_moex.to_dataframe())
+    print(len(index_moex))

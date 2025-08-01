@@ -27,9 +27,9 @@ class TelegramConfig(BaseModel):
 
 
 class UserLinksConfig(BaseModel):
-    broker_account_id: str
-    broker_account_name: str
-    index_name: str
+    broker_account_id: str = None
+    broker_account_name: str = None
+    index_name: str = None
 
 
 class UserScheduleConfig(BaseModel):

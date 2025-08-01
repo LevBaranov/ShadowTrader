@@ -1,12 +1,12 @@
-from typing import List
+from typing import List, Tuple
 from aiogram.utils.keyboard import InlineKeyboardBuilder
 from aiogram.types import Message
 
 from string import Template
 from src.bot.texts import welcome_user, welcome_guest, free_cash, position, action, success, error_text, errors
-from src.bot.texts import change_scheduler
+from src.bot.texts import set_scheduler, set_tracking_index
 from src.bot.utils import AccountCallbackFactory, BalanceActionsCallbackFactory, ActionsCallbackFactory
-from src.bot.utils import ScheduleCallbackFactory
+from src.bot.utils import ScheduleCallbackFactory, SetIndexCallbackFactory
 from src.bot.scheduler import ScheduleFrequency
 from src.config.base import UserLinksConfig
 from src.models.account import Account
@@ -48,7 +48,6 @@ def get_actions_keys():
     builder.adjust(2)
     return builder.as_markup()
 
-
 def get_scheduler_keys():
     builder = InlineKeyboardBuilder()
     for period in ScheduleFrequency:
@@ -60,6 +59,18 @@ def get_scheduler_keys():
         text="Никогда", callback_data=ScheduleCallbackFactory(frequency="NEVER")
     )
     builder.adjust(2)
+    return builder.as_markup()
+
+def get_indices_keys(indices: List[Tuple[str, str]]):
+    builder = InlineKeyboardBuilder()
+
+    for index, short_name in indices:
+
+        builder.button(
+            text=f"{short_name}({index})", callback_data=SetIndexCallbackFactory(index=index)
+        )
+
+    builder.adjust(1)
     return builder.as_markup()
 
 #endregion Keys
@@ -111,8 +122,12 @@ async def actions_result_message(message: Message, success_action_list: List[Act
     mes = f"{success_message}\n{error_message}"
     await message.answer(mes)
 
-async def change_scheduler_message(message: Message):
+async def scheduler_setting_message(message: Message):
 
-    await message.answer(change_scheduler, reply_markup=get_scheduler_keys())
+    await message.answer(set_scheduler, reply_markup=get_scheduler_keys())
+
+async def tracking_index_setting_message(message: Message, indices: List[Tuple[str, str]]):
+
+    await message.answer(set_tracking_index, reply_markup=get_indices_keys(indices))
 
 #endregion Message

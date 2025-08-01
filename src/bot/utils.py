@@ -21,6 +21,9 @@ class ActionsCallbackFactory(CallbackData, prefix="actions"):
 class ScheduleCallbackFactory(CallbackData, prefix="schedule"):
     frequency: str
 
+class SetIndexCallbackFactory(CallbackData, prefix="set_index"):
+    index: str
+
 
 class PortfolioRebalanceState(StatesGroup):
     get_actions = State()

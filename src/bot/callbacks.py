@@ -5,11 +5,11 @@ from aiogram.fsm.context import FSMContext
 from src.core.portfolio_manager import PortfolioManager
 
 from src.bot.utils import AccountCallbackFactory, ActionsCallbackFactory, BalanceActionsCallbackFactory
-from src.bot.utils import ScheduleCallbackFactory
+from src.bot.utils import ScheduleCallbackFactory, SetIndexCallbackFactory
 from src.bot.utils import PortfolioRebalanceState, get_actions_list
 
-from src.bot.ui import actions_list_message, actions_result_message, welcome_user_answer
-from src.bot.ui import change_user_links_answer, portfolio_structure_message, change_scheduler_message
+from src.bot.ui import actions_list_message, actions_result_message, welcome_user_answer, tracking_index_setting_message
+from src.bot.ui import change_user_links_answer, portfolio_structure_message, scheduler_setting_message
 
 from src.config import settings, ConfigLoader
 
@@ -27,9 +27,21 @@ async def callbacks_account(
     manager = PortfolioManager()
     account = [acc for acc in manager.get_user_accounts() if acc.id == account_id]
 
-    ConfigLoader.add_link(callback.from_user.id, account_id, account[0].name)
+    ConfigLoader.update_broker_account(callback.from_user.id, account_id, account[0].name)
     updated_settings = ConfigLoader.config
-    await change_scheduler_message(callback.message)
+    await tracking_index_setting_message(callback.message, manager.get_indices_list())
+    await callback.answer()
+
+
+@router.callback_query(SetIndexCallbackFactory.filter())
+async def callbacks_account(
+        callback: CallbackQuery,
+        callback_data: SetIndexCallbackFactory
+):
+
+    ConfigLoader.update_tracking_index(callback.from_user.id, callback_data.index)
+    updated_settings = ConfigLoader.config
+    await scheduler_setting_message(callback.message)
     await callback.answer()
 
 
