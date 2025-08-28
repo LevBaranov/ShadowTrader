@@ -1,8 +1,10 @@
 import os
 import toml
 from pathlib import Path
-from src.config.base import AppConfig, UserLinksConfig, UserScheduleConfig
 from datetime import datetime
+
+from src.models import AppConfig, UserLinksConfig, UserScheduleConfig
+
 
 ENV = os.getenv("APP_ENV", "prod")
 CONFIG_PATH = Path(__file__).parent / "environments" / f"{ENV}.toml"

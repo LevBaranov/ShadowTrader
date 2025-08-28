@@ -2,7 +2,8 @@ from aiogram.filters.callback_data import CallbackData
 from aiogram.fsm.state import StatesGroup, State
 
 from src.config import settings
-from src.config.base import UserLinksConfig
+
+from src.models import UserLinksConfig
 
 
 class AccountCallbackFactory(CallbackData, prefix="account"):
