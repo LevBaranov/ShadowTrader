@@ -3,9 +3,10 @@ import logging
 from aiogram import Bot, Dispatcher
 from aiogram.fsm.storage.memory import MemoryStorage
 
-import handlers, callbacks
-
 from src.config import settings
+
+from src.bot import handlers, callbacks
+
 from src.core.scheduler import Scheduler
 
 
