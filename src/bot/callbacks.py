@@ -4,14 +4,15 @@ from aiogram.fsm.context import FSMContext
 
 from src.core.portfolio_manager import PortfolioManager
 
+from src.config import settings, ConfigLoader
+
 from src.bot.utils import AccountCallbackFactory, ActionsCallbackFactory, BalanceActionsCallbackFactory
 from src.bot.utils import ScheduleCallbackFactory, SetIndexCallbackFactory
-from src.bot.utils import PortfolioRebalanceState, get_actions_list
+from src.bot.utils import PortfolioRebalanceState
 
 from src.bot.ui import actions_list_message, actions_result_message, welcome_user_answer, tracking_index_setting_message
 from src.bot.ui import change_user_links_answer, portfolio_structure_message, scheduler_setting_message
 
-from src.config import settings, ConfigLoader
 
 router = Router()
 router.callback_query.filter(F.from_user.id.in_([user.telegram_id for user in settings.users]))
@@ -66,8 +67,11 @@ async def callbacks_account(
     user = [user for user in settings.users if user.telegram_id == callback.from_user.id][0]
     if callback_data.action == "rebalance":
         account_id = user.links.broker_account_id
+
         manager = PortfolioManager(account_id)
-        portfolio, actions, cash = get_actions_list(manager, user.links.index_name)
+        portfolio = manager.get_portfolio()
+        index_moex = manager.get_index_list(user.links.index_name)
+        actions, new_balance = manager.get_action_for_rebalance(portfolio, index_moex)
 
         await portfolio_structure_message(callback.message, portfolio)
         await state.update_data(manager=manager)

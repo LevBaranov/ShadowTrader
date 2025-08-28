@@ -1,17 +1,11 @@
 import os
-from enum import Enum
 from datetime import datetime, timedelta
 import asyncio
 
 from src.core.portfolio_manager import PortfolioManager
 from src.config import settings, ConfigLoader
-from src.bot.utils import get_actions_list
 
-
-class ScheduleFrequency(Enum):
-    WEEKLY = "Раз в неделю"
-    MONTHLY = "Раз в 30 дней"
-    QUARTERLY = "Раз в квартал"
+from src.models import ScheduleFrequency
 
 
 class Scheduler:
@@ -39,9 +33,9 @@ class Scheduler:
             obj_type = type(obj[0]).__name__
             filename = f"{obj_type}s.txt"
 
-            os.makedirs('results', exist_ok=True)
+            os.makedirs('../scheduler_results', exist_ok=True)
 
-            filepath = os.path.join('results', filename)
+            filepath = os.path.join('../scheduler_results', filename)
 
             with open(filepath, 'a', encoding='utf-8') as f:
                 for item in obj:
@@ -52,12 +46,16 @@ class Scheduler:
 
                 if user.schedule and should_rebalance(user.schedule.last_run, user.schedule.rebalance_frequency):
                     account_id = user.links.broker_account_id
+
                     manager = PortfolioManager(account_id)
-                    portfolio, actions, cash = get_actions_list(manager, user.links.index_name)
-                    print(f"{portfolio, actions, cash =}")
+                    portfolio = manager.get_portfolio()
+
                     balance_before_balance = portfolio.cash.to_float()
                     if balance_before_balance > settings.balancer.max_cash:
                         print("Bingo")
+                        index_moex = manager.get_index_list(user.links.index_name)
+                        actions, new_balance = manager.get_action_for_rebalance(portfolio, index_moex)  # Для обновления списка действий
+                        #TODO: Сделать уведомления о действиях выполненных по расписанию
                         success_action_list, error_action_list = manager.execute_actions()
                         save_result(success_action_list)
                         save_result(error_action_list)

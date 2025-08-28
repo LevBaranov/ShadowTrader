@@ -3,11 +3,11 @@ import logging
 from aiogram import Bot, Dispatcher
 from aiogram.fsm.storage.memory import MemoryStorage
 
-
 import handlers, callbacks
 
 from src.config import settings
-from src.bot.scheduler import Scheduler
+from src.core.scheduler import Scheduler
+
 
 async def main():
     telegram_token = settings.telegram.token

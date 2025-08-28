@@ -3,16 +3,16 @@ from aiogram.utils.keyboard import InlineKeyboardBuilder
 from aiogram.types import Message
 
 from string import Template
+
 from src.bot.texts import welcome_user, welcome_guest, free_cash, position, action, success, error_text, errors
 from src.bot.texts import set_scheduler, set_tracking_index
 from src.bot.utils import AccountCallbackFactory, BalanceActionsCallbackFactory, ActionsCallbackFactory
 from src.bot.utils import ScheduleCallbackFactory, SetIndexCallbackFactory
-from src.bot.scheduler import ScheduleFrequency
+
 from src.config.base import UserLinksConfig
-from src.models.account import Account
-from src.models.positions import Positions
-from src.models.action import Action
-from src.models.error import Error
+
+from src.models import Account, Positions, Action, Error, ScheduleFrequency
+
 
 #region Keys
 
