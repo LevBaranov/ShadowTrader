@@ -6,11 +6,12 @@ from aiogram.filters import Command
 
 from src.core.portfolio_manager import PortfolioManager
 
+from src.config import settings
+
 from src.bot.texts import welcome_head
 from src.bot.utils import check_links_exist
 from src.bot.ui import welcome_user_answer, change_user_links_answer
 
-from src.config import settings
 
 router = Router()
 router.message.filter(F.chat.id.in_([user.telegram_id for user in settings.users]))

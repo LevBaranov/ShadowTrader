@@ -7,13 +7,11 @@ from tinkoff.invest import Client, OrderDirection, OrderType, RequestError
 from tinkoff.invest.constants import INVEST_GRPC_API_SANDBOX
 
 from src.config import settings
-from src.models.account import Account
-from src.models.positions import Positions, PositionsShare, PositionsCash, Cash
-from src.models.share import Share, ShareList
-from src.models.action import Action
-from src.models.error import Error
 
 from src.services.utils import cache_data, log_response
+
+from src.models import Account, Positions, PositionsShare, PositionsCash, Cash, Share, ShareList, Action, Error
+
 
 class TBroker:
     """
