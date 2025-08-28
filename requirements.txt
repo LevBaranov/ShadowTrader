@@ -1,10 +1,10 @@
-tinkoff-investments==0.2.0b110
-pandas==2.2.3
-requests==2.32.3
-pydantic==2.11.3
-pydantic-settings==2.9.1
+tinkoff-investments==0.2.0b115
+pandas==2.3.2
+requests==2.32.5
+pydantic==2.11.7
+pydantic-settings==2.10.1
 toml==0.10.2
-aiogram==3.20.0
-pytest==8.4.0
+aiogram==3.22.0
+pytest==8.4.1
 pytest-mock==3.14.1
 requests-mock==1.12.1
