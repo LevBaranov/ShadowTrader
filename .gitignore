@@ -1,4 +1,4 @@
 .env
-/config/environments/*.toml
+*.toml
 *.jsonl
 *.txt
