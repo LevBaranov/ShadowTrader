@@ -3,7 +3,7 @@ from aiogram.fsm.state import StatesGroup, State
 
 from src.config import settings
 
-from src.models import UserLinksConfig
+from src.models.config import UserLinksConfig
 
 
 class AccountCallbackFactory(CallbackData, prefix="account"):

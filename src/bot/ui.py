@@ -9,7 +9,12 @@ from src.bot.texts import set_scheduler, set_tracking_index
 from src.bot.utils import AccountCallbackFactory, BalanceActionsCallbackFactory, ActionsCallbackFactory
 from src.bot.utils import ScheduleCallbackFactory, SetIndexCallbackFactory
 
-from src.models import Account, Positions, Action, Error, ScheduleFrequency, UserLinksConfig
+from src.models.account import Account
+from src.models.positions import Positions
+from src.models.action import Action
+from src.models.error import Error
+from src.models.scheduler_frequency import ScheduleFrequency
+from src.models.config import UserLinksConfig
 
 
 #region Keys

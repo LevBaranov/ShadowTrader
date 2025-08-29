@@ -5,7 +5,7 @@ import asyncio
 from src.core.portfolio_manager import PortfolioManager
 from src.config import settings, ConfigLoader
 
-from src.models import ScheduleFrequency
+from src.models.scheduler_frequency import ScheduleFrequency
 
 
 class Scheduler:

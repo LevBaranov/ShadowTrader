@@ -3,7 +3,11 @@ from typing import List, Tuple, Dict, Optional
 
 from src.core.balancer import Balancer
 
-from src.models import Action, Positions, Account, Index, Error
+from src.models.account import Account
+from src.models.positions import Positions
+from src.models.action import Action
+from src.models.error import Error
+from src.models.index import  Index
 
 from src.services.broker import TBroker, TAccount
 from src.services.stock_market import Moex

@@ -3,7 +3,8 @@ from typing import List, Tuple, Dict
 
 from src.config import settings
 
-from src.models import Positions, Index
+from src.models.positions import Positions
+from src.models.index import Index
 
 
 class Balancer:

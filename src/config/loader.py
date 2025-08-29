@@ -3,11 +3,13 @@ import toml
 from pathlib import Path
 from datetime import datetime
 
-from src.models import AppConfig, UserLinksConfig, UserScheduleConfig
+from src.models.config import AppConfig, UserLinksConfig, UserScheduleConfig
 
 
 ENV = os.getenv("APP_ENV", "prod")
-CONFIG_PATH = Path(__file__).parent / "environments" / f"{ENV}.toml"
+parents = Path(__file__).parents
+app_root = parents[2]  # не нравится мне эта магия чисел
+config_file = Path.joinpath(app_root, f"{ENV}.toml")
 
 
 class ConfigLoader:
@@ -15,13 +17,13 @@ class ConfigLoader:
 
     @classmethod
     def load(cls):
-        data = toml.loads(CONFIG_PATH.read_text())
+        data = toml.loads(config_file.read_text())
         cls.config = AppConfig(**data)
 
     @classmethod
     def save(cls):
         raw = cls.config.model_dump()
-        CONFIG_PATH.write_text(toml.dumps(raw))
+        config_file.write_text(toml.dumps(raw))
 
     @classmethod
     def update_broker_account(

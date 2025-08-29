@@ -2,7 +2,8 @@ import requests
 
 from src.config import settings
 
-from src.models import Index, IndexItem, Error
+from src.models.index import Index, IndexItem
+from src.models.error import Error
 
 
 class Moex:
