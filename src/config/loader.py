@@ -7,9 +7,8 @@ from src.models.config import AppConfig, UserLinksConfig, UserScheduleConfig
 
 
 ENV = os.getenv("APP_ENV", "prod")
-parents = Path(__file__).parents
-app_root = parents[2]  # не нравится мне эта магия чисел
-config_file = Path.joinpath(app_root, f"{ENV}.toml")
+CONFIG_FILE_PATH = os.getenv("APP_CONFIG_FILE_PATH", "/")
+config_file = Path(f"{CONFIG_FILE_PATH}{ENV}.toml")
 
 
 class ConfigLoader:
