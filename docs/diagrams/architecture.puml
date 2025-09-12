@@ -1,0 +1,48 @@
+@startuml
+!include https://raw.githubusercontent.com/plantuml-stdlib/C4-PlantUML/master/C4_Container.puml
+
+title ShadowTrader
+
+Person(user, "User", "Взаимодействует через Telegram-бот")
+
+System_Boundary(app, "ShadowTrader") {
+
+    Container(main, "main", "Python module", "Точка входа в приложение")
+
+    Container(bot, "bot", "Container", "UI, тексты, обработчики, коллбеки и утилиты бота")
+
+    Container(core, "core", "Container", "Логика: PortfolioManager, Balancer, Scheduler")
+
+    Container(services, "services", "Container", "Интеграции")
+
+    Container(config, "config", "Container", "Загрузчик конфигурации")
+
+    Container(models, "models", "Container", "Сущности и объекты")
+}
+
+' Внешние системы (облачка)
+System_Ext(telegram, "Telegram", "Мессенджер")
+System_Ext(moex, "Moex", "Московская биржа")
+System_Ext(tbank, "Tbank", "Брокер")
+
+' Связи
+Rel(user, telegram, "Использует")
+Rel(main, telegram, "Отправляет сообщения / получает апдейты")
+
+Rel(main, bot, "Инициализирует")
+Rel(main, core, "Запускает задачу на расписание")
+Rel(main, config, "Загружает конфигурацию")
+
+Rel(bot, core, "Передаёт команды")
+Rel(bot, config, "Читает настройки")
+Rel(bot, models, "Формирует модели")
+
+Rel(core, services, "Использует для данных и заявок")
+Rel(core, config, "Читает настройки")
+Rel(core, models, "Формирует модели")
+Rel(config, models, "Формирует объекты конфигурации")
+
+Rel(services, moex, "Запрашивает котировки")
+Rel(services, tbank, "Управляет позициями и заявками")
+
+@enduml

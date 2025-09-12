@@ -1,0 +1,42 @@
+name: Generate PlantUML Diagrams
+
+on:
+  push:
+    paths:
+      - "docs/diagrams/*.puml"
+  workflow_dispatch:
+
+jobs:
+  render-diagrams:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout repo
+        uses: actions/checkout@v4
+
+      - name: Setup Java
+        uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: 17
+
+      - name: Download PlantUML
+        run: curl -L -o plantuml.jar https://github.com/plantuml/plantuml/releases/latest/download/plantuml.jar
+
+      - name: Generate diagrams
+        run: |
+          mkdir -p docs
+          for f in docs/diagrams/*.puml; do
+            java -jar plantuml.jar -tpng "$f" -o ../imgs
+          done
+
+      - name: Commit generated diagrams
+        run: |
+          git config --global user.name "github-actions[bot]"
+          git config --global user.email "github-actions[bot]@users.noreply.github.com"
+          git add docs/imgs/*.png
+          if git commit -m "Auto-update diagrams" ; then
+            git push
+          else
+            echo "No changes to commit"
+          fi
