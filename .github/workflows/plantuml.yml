@@ -6,6 +6,9 @@ on:
       - "docs/diagrams/*.puml"
   workflow_dispatch:
 
+permissions:
+  contents: write
+
 jobs:
   render-diagrams:
     runs-on: ubuntu-latest
@@ -23,9 +26,12 @@ jobs:
       - name: Download PlantUML
         run: curl -L -o plantuml.jar https://github.com/plantuml/plantuml/releases/latest/download/plantuml.jar
 
+      - name: Install Graphviz
+        run: sudo apt-get update && sudo apt-get install -y graphviz
+
       - name: Generate diagrams
         run: |
-          mkdir -p docs
+          mkdir -p docs/imgs
           for f in docs/diagrams/*.puml; do
             java -jar plantuml.jar -tpng "$f" -o ../imgs
           done
