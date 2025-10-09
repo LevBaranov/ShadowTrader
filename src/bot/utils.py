@@ -32,8 +32,7 @@ def check_links_exist(user_id: int) -> UserLinksConfig:
 
     if (user[0].links
             and user[0].links.index_name
-            and user[0].links.broker_account_id
-            and user[0].links.broker_account_name):
+            and user[0].links.broker_account_id):
         return user[0].links
     else:
         return None

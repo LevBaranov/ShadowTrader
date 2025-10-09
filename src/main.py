@@ -18,8 +18,8 @@ async def main():
 
     await bot.delete_webhook(drop_pending_updates=True)
 
-    scheduler = Scheduler()
-    asyncio.create_task(scheduler.rebalance_scheduler())
+    scheduler = Scheduler(bot)
+    asyncio.create_task(scheduler.run())
 
     await dp.start_polling(bot)
 
