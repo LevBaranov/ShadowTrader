@@ -31,5 +31,5 @@ jobs:
           context: .
           push: true
           tags: |
-            ghcr.io/${{ github.repository_owner }}/shadow-trader:${{ env.VERSION }}
-            ghcr.io/${{ github.repository_owner }}/shadow-trader:latest
+            ghcr.io/levbaranov/shadowtrader:${{ env.VERSION }}
+            ghcr.io/levbaranov/shadowtrader:latest
