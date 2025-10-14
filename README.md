@@ -8,10 +8,12 @@
 > На текущий момент в качестве брокера может быть только Т-банк.
 
 ## Начало работы
+### 1. Скачайте файл конфигурации
 Для запуска бота потребуется сделать копию файла конфигурации:
 ```commandline
-cp prod.toml-example prod.toml
+wget -O prod.toml https://raw.githubusercontent.com/LevBaranov/ShadowTrader/refs/heads/master/prod.toml-example
 ```
+### 2. Сформируйте свою конфигурацию
 Заполните файл конфигурации. Обязательные поля для заполнения:
 * `telegram.token` - токен вашего бота в телеграм
 * `broker.token` - токен для работы с портфелем в Т-банке 
@@ -23,15 +25,16 @@ cp prod.toml-example prod.toml
 > 
 > В процессе работы появятся блоки `users.links` и `users.schedule` их трогать не надо. Управление этими блоками через 
 > бота.
-
+### 3. Создайте директорию для логов
 Создайте директорию для логов и результатов выполненных по расписанию.
 ```commandline
 mkdir scheduler_results
 mkdir logs
 ```
-Соберите образ контейнера и запустите:
+### 4. Соберите образ
+Скачайте образ контейнера и запустите:
 ```commandline
-docker build -t shadowtrader:latest .
+docker pull ghcr.io/levbaranov/shadowtrader:latest
 docker run --rm -it  \
     -v $(pwd)/prod.toml:/prod.toml   \
     -v $(pwd)/scheduler_results:/scheduler_results   \
