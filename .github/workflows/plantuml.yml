@@ -16,6 +16,9 @@ jobs:
     steps:
       - name: Checkout repo
         uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+          persist-credentials: true
 
       - name: Setup Java
         uses: actions/setup-java@v4
@@ -38,11 +41,13 @@ jobs:
 
       - name: Commit generated diagrams
         run: |
+          branch=$(git rev-parse --abbrev-ref HEAD)
           git config --global user.name "github-actions[bot]"
           git config --global user.email "github-actions[bot]@users.noreply.github.com"
-          git add docs/imgs/*.png
-          if git commit -m "Auto-update diagrams" ; then
-            git push
-          else
+          git add docs/imgs/*.png || true
+          if git diff --cached --quiet; then
             echo "No changes to commit"
+          else
+            git commit -m "Auto-update diagrams"
+            git push origin "$branch"
           fi
