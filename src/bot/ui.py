@@ -1,3 +1,4 @@
+from datetime import datetime
 from typing import List, Tuple
 from aiogram.utils.keyboard import InlineKeyboardBuilder
 from aiogram.types import Message
@@ -6,6 +7,7 @@ from string import Template
 
 from src.bot.texts import welcome_user, welcome_guest, free_cash, position, action, success, error_text, errors
 from src.bot.texts import set_scheduler, set_tracking_index
+from src.bot.texts import user_settings_text_template
 from src.bot.utils import AccountCallbackFactory, BalanceActionsCallbackFactory, ActionsCallbackFactory
 from src.bot.utils import ScheduleCallbackFactory, SetIndexCallbackFactory
 
@@ -14,7 +16,7 @@ from src.models.positions import Positions
 from src.models.action import Action
 from src.models.error import Error
 from src.models.scheduler_frequency import ScheduleFrequency
-from src.models.config import UserLinksConfig
+from src.models.config import UserLinksConfig, UserConfig
 
 
 #region Keys
@@ -90,6 +92,13 @@ async def welcome_user_answer(message: Message, links: UserLinksConfig, message_
     await message.answer(mes, reply_markup=get_actions_keys())
 
 async def change_user_links_answer(message: Message, accounts: List[Account], message_header: str = None):
+    """
+    Формирует и отправляет сообщение по шаблону для настройки связки между аккаунтом пользователя и индексом Мосбиржи
+    :param message: Сообщение для ответа и отправки сообщения
+    :param accounts: Аккаунт пользователя у брокера
+    :param message_header: Заголовок сообщения
+    :return:
+    """
     markup = get_accounts_keys(accounts)
     mes = Template(welcome_guest).substitute(
         accounts_count=len(accounts)
@@ -132,5 +141,23 @@ async def scheduler_setting_message(message: Message):
 async def tracking_index_setting_message(message: Message, indices: List[Tuple[str, str]]):
 
     await message.answer(set_tracking_index, reply_markup=get_indices_keys(indices))
+
+async def user_settings_message(message: Message, user_settings: UserConfig):
+    """
+    Формирует и отправляет сообщение по шаблону с настройками пользователя
+    :param message: Сообщение для ответа
+    :param user_settings: Пользовательские настройки
+    :return:
+    """
+    frequency = ScheduleFrequency[user_settings.schedule.rebalance_frequency]
+    last_run = user_settings.schedule.last_run.date()
+    mes = Template(user_settings_text_template).substitute(
+        telegram_id=user_settings.telegram_id,
+        broker_account_name=user_settings.links.broker_account_name,
+        index_name=user_settings.links.index_name,
+        rebalance_frequency=frequency.value,
+        last_run=last_run
+    )
+    await message.answer(mes)
 
 #endregion Message
