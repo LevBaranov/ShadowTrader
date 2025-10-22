@@ -27,7 +27,12 @@ class PortfolioRebalanceState(StatesGroup):
     get_actions = State()
 
 
-def check_links_exist(user_id: int) -> UserLinksConfig:
+def check_links_exist(user_id: int) -> UserLinksConfig | None:
+    """
+    Проверяем наличие настроенной связки между аккаунтом в брокере и индексом Мосбиржи для пользователя.
+    :param user_id: Идентификатор пользователя в телеграм
+    :return: Информация по существующей связки пользователя
+    """
     user = [ user for user in settings.users if user.telegram_id == user_id]
 
     if (user[0].links

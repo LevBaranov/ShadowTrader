@@ -13,3 +13,10 @@ success = "Успешно:\n"
 errors = "Ошибки:\n"
 set_scheduler = "Выберите как часто выполнять синхронизацию:"
 set_tracking_index = "Выберите, что хотите отслеживать:"
+user_settings_text_template = """Пользователь: $telegram_id
+Аккаунт брокера: $broker_account_name
+Индекс Мосбиржи: $index_name
+
+Расписание настроено: $rebalance_frequency
+Последняя балансировка была: $last_run
+"""
