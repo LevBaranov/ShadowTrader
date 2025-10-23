@@ -19,3 +19,8 @@ class MoexBond:
     buy_back_price: float
 
 
+@dataclass()
+class Bond(InstrumentBase):
+    """
+    Дата класс описывающий облигацию с данными от брокера
+    """

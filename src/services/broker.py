@@ -7,12 +7,14 @@ from tinkoff.invest import Client, OrderDirection, OrderType, RequestError
 from tinkoff.invest.constants import INVEST_GRPC_API_SANDBOX
 
 from src.config import settings
+from src.models.instrument import InstrumentBase
 
 from src.services.utils import cache_data, log_response
 
 from src.models.account import Account
-from src.models.positions import Positions, PositionsShare, PositionsCash, Cash
+from src.models.positions import Positions, PositionsCash, Cash, PositionsInstrument
 from src.models.share import Share, ShareList
+from src.models.bond import Bond
 from src.models.action import Action
 from src.models.error import Error
 
@@ -27,6 +29,8 @@ class TBroker:
         self.target = INVEST_GRPC_API_SANDBOX if sandbox else None
         self._shares_by_uid: Dict[str, Share] = {}
         self._shares_by_ticker: Dict[str, Share] = {}
+        self._instruments_by_uid: Dict[str, InstrumentBase] = {}
+        self._instruments_by_ticker: Dict[str, InstrumentBase] = {}
 
     @contextmanager
     def get_client(self):
@@ -59,7 +63,7 @@ class TBroker:
         with self.get_client() as client:
             instruments = client.instruments
             shares = [
-                Share(f.uid, f.figi, f.ticker, f.lot, f.isin)
+                Share(f.uid, f.figi, f.ticker, f.lot, f.isin, "share")
                 for f in instruments.shares().instruments if f.currency == 'rub'
             ]
             for share in shares:
@@ -93,6 +97,59 @@ class TBroker:
 
         return result
 
+    @log_response()
+    def find_instrument(self, value: str, field: str = "uid") -> Optional[InstrumentBase]:
+        """
+        Метод для поиска информации об облигациях. Может принимать на вход uid или ticker
+        :param value: Значение, по которому осуществляется поиск.
+        :param field: Тип значения, по которому ищем. Допустимые значения: uid, ticker.
+        :return: Bond. Информация об облигации
+        """
+        def _find(_value: str, _field: str = "uid"):
+
+            lookup_maps = {
+                "ticker": self._instruments_by_ticker,
+                "uid": self._instruments_by_uid
+            }
+            return lookup_maps.get(_field, {}).get(_value)
+
+        result = _find(value, field)
+        if not result:
+            self.get_all_instruments()
+            # пересоздаём lookup_maps, так как словари могли обновиться
+            result = _find(value, field)
+
+        return result
+
+    @log_response()
+    def get_all_instruments(self) -> list[InstrumentBase]:
+        """
+        Возвращает список всех инструментов с их дополнительной информацией.
+        :return: Список инструментов с их базовой информацией
+        """
+        all_instruments = []
+        with self.get_client() as client:
+            broker_instruments = client.instruments
+
+            for _i in broker_instruments.bonds().instruments:
+                if _i.currency == 'rub':
+                    instrument = InstrumentBase(_i.uid, _i.figi, _i.ticker, _i.lot, _i.isin, "bond")
+                    self._instruments_by_uid[instrument.uid] = instrument
+                    self._instruments_by_ticker[instrument.ticker] = instrument
+
+                    all_instruments.append(instrument)
+
+            for _i in broker_instruments.shares().instruments:
+                if _i.currency == 'rub':
+                    instrument = InstrumentBase(_i.uid, _i.figi, _i.ticker, _i.lot, _i.isin, "share")
+                    self._instruments_by_uid[instrument.uid] = instrument
+                    self._instruments_by_ticker[instrument.ticker] = instrument
+
+                    all_instruments.append(instrument)
+
+        return all_instruments
+
+
 
 class TAccount:
     """
@@ -107,6 +164,18 @@ class TAccount:
         """
         Возвращает позиции на счете.
         """
+        def create_position_instrument(_i:InstrumentBase, _b:int, _last_price) -> PositionsInstrument:
+
+            return PositionsInstrument(
+                            uid=_i.uid,
+                            figi=_i.figi,
+                            balance=_b,
+                            last_price=Cash(**asdict(_last_price)),
+                            lot_size=_i.lot_size,
+                            ticker=_i.ticker,
+                            type=_i.type
+                        )
+
 
         with self.broker.get_client() as client:
             positions = client.operations.get_positions(account_id=self.account_id)
@@ -117,12 +186,15 @@ class TAccount:
 
             # Матчим акции и баланс
             instrument_uids = []
-            share_balance = []
-            for position in positions.securities:
-                share = self.broker.find_share(position.instrument_uid)
-                instrument_uids.append(position.instrument_uid)
-                if share: # Проблема с BBG007N0Z367. Его нет в списке всех акций, но в портфеле он остался, хоть и продан
-                    share_balance.append((share, position.balance))
+            instrument_balance = []
+            for _position in positions.securities:
+                if _position.instrument_type in ["share", "bond"]:
+                    instrument_uids.append(_position.instrument_uid)
+                    instrument = self.broker.find_instrument(_position.instrument_uid)
+
+                    # TODO: Возможно логика лишняя и требует удаления
+                    if instrument:  # Проблема с BBG007N0Z367. Его нет в списке всех акций, но в портфеле он остался, хоть и продан
+                        instrument_balance.append((instrument, _position.balance))
 
             # Получаем информацию о последних ценах
             last_prices = {
@@ -130,21 +202,23 @@ class TAccount:
                 for last_price in client.market_data.get_last_prices(
                     instrument_id=[p.instrument_uid for p in positions.securities]).last_prices
             }
+
             shares_positions = []
-            for share, balance in share_balance:
-                shares_positions.append(
-                    PositionsShare(
-                        share_uid=share.uid,
-                        figi=share.figi,
-                        balance=balance,
-                        last_price=Cash(**asdict(last_prices.get(share.uid))),
-                        lot_size=share.lot_size,
-                        ticker=share.ticker
+            bonds_positions = []
+            for _instrument, _balance in instrument_balance:
+                if _instrument.type == "share":
+                    shares_positions.append(
+                        create_position_instrument(_instrument, _balance, last_prices.get(_instrument.uid))
                     )
-                )
+                if _instrument.type == "bond":
+                    bonds_positions.append(
+                        create_position_instrument(_instrument, _balance, last_prices.get(_instrument.uid))
+                    )
+
         return Positions(
             cash=PositionsCash(**asdict(positions.money[0])) if positions.money else None,
-            shares=shares_positions
+            shares=shares_positions,
+            bonds=bonds_positions
         )
 
     def create_order(self, action: Action):
@@ -176,8 +250,8 @@ if __name__ == "__main__":
 
 
     br = TBroker()
-    print(br.find_share("SBER", "ticker"))
-    pprint.pprint(br.get_all_shares())
+    # print(br.find_share("SBER", "ticker"))
+    # pprint.pprint(br.get_all_shares())
     accs = br.get_all_accounts()
     print(accs)
 

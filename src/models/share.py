@@ -2,14 +2,16 @@ from dataclasses import dataclass, field, asdict
 import pandas as pd
 from typing import List
 
-@dataclass()
-class Share:
+from src.models.instrument import InstrumentBase
 
-    uid: str
-    figi: str
-    ticker: str
-    lot_size: int
-    isin: str
+
+@dataclass()
+class Share(InstrumentBase):
+    """
+    Дата класс, описывающий акции с данными от брокера
+    """
+
+
 
 @dataclass
 class ShareList:

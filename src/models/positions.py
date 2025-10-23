@@ -13,26 +13,40 @@ class Cash:
 class PositionsCash(Cash):
     currency: str
 
+# @dataclass()
+# class PositionsShare:
+#     share_uid: str
+#     figi: str
+#     balance: int
+#     last_price: Cash
+#     lot_size: int
+#     ticker: str
+
 @dataclass()
-class PositionsShare:
-    share_uid: str
+class PositionsInstrument:
+    """
+    Дата класс, описывающий позицию по финансовому инструменту
+    """
+    uid: str
     figi: str
     balance: int
     last_price: Cash
     lot_size: int
     ticker: str
+    type: str
 
 @dataclass()
 class Positions:
     cash: PositionsCash
-    shares: list[PositionsShare] = field(default_factory=list)
+    shares: list[PositionsInstrument] = field(default_factory=list)
+    bonds: list[PositionsInstrument] = field(default_factory=list)
 
     def shares_to_dataframe(self) -> pd.DataFrame:
         data = []
         if self.shares:
             for share in self.shares:
                 item = {
-                    "share_uid": share.share_uid,
+                    "share_uid": share.uid,
                     "figi": share.figi,
                     "balance": share.balance,
                     "last_price": share.last_price.to_float(),
