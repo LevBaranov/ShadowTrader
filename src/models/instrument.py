@@ -11,6 +11,6 @@ class InstrumentBase:
     figi: str
     ticker: str
     lot_size: int
-    isin: str
+    isin: str | None
     type: str
 

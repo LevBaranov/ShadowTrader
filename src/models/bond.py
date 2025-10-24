@@ -22,5 +22,11 @@ class MoexBond:
 @dataclass()
 class Bond(InstrumentBase):
     """
-    Дата класс описывающий облигацию с данными от брокера
+    Дата класс описывающий облигацию с данными от брокера и Мосбиржи
     """
+
+    offer_date: str
+    call_option_date: str
+    put_option_date: str
+    buy_back_price: float
+

@@ -4,7 +4,7 @@ from typing import List, Tuple, Dict, Optional
 from src.core.balancer import Balancer
 
 from src.models.account import Account
-from src.models.bond import MoexBond
+from src.models.bond import MoexBond, Bond
 from src.models.positions import Positions
 from src.models.action import Action
 from src.models.error import Error
@@ -133,13 +133,29 @@ class PortfolioManager:
             self.set_account(account_id)
 
         moex_bonds: list[MoexBond] = self.moex.get_bonds()
-        moex_bonds_tickers = { _moex_bond.ticker for _moex_bond in moex_bonds if _moex_bond.offer_date }
+        moex_bonds_by_tickers = { _moex_bond.ticker : _moex_bond for _moex_bond in moex_bonds if _moex_bond.offer_date }
         portfolio_bonds = self.account_client.get_positions().bonds
 
-        bonds = [ _portfolio_bond for _portfolio_bond in portfolio_bonds if _portfolio_bond.ticker in moex_bonds_tickers ]
+        callable_bonds = []
+        for _portfolio_bond in portfolio_bonds:
+            if _portfolio_bond.ticker in moex_bonds_by_tickers.keys():
 
+                callable_bonds.append(
+                    Bond(
+                        uid=_portfolio_bond.uid,
+                        figi=_portfolio_bond.figi,
+                        ticker=_portfolio_bond.ticker,
+                        lot_size=_portfolio_bond.lot_size,
+                        type=_portfolio_bond.type,
+                        isin=None,
+                        offer_date=moex_bonds_by_tickers[_portfolio_bond.ticker].offer_date,
+                        call_option_date=moex_bonds_by_tickers[_portfolio_bond.ticker].call_option_date,
+                        put_option_date=moex_bonds_by_tickers[_portfolio_bond.ticker].put_option_date,
+                        buy_back_price=moex_bonds_by_tickers[_portfolio_bond.ticker].buy_back_price
+                    )
+                )
 
-        return bonds
+        return callable_bonds
 
 if __name__ == "__main__":
     import pprint

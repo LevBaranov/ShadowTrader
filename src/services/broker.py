@@ -14,7 +14,6 @@ from src.services.utils import cache_data, log_response
 from src.models.account import Account
 from src.models.positions import Positions, PositionsCash, Cash, PositionsInstrument
 from src.models.share import Share, ShareList
-from src.models.bond import Bond
 from src.models.action import Action
 from src.models.error import Error
 
