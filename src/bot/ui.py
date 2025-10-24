@@ -16,7 +16,7 @@ from src.models.positions import Positions
 from src.models.action import Action
 from src.models.error import Error
 from src.models.scheduler_frequency import ScheduleFrequency
-from src.models.config import UserLinksConfig, UserConfig
+from src.models.config import UserIndexBindingsConfig, UserConfig
 
 
 #region Keys
@@ -42,9 +42,16 @@ def get_balance_actions_keys():
     return builder.as_markup()
 
 def get_actions_keys():
+    """
+    Функция подготовки кнопок возможных действий бота
+    :return:
+    """
     builder = InlineKeyboardBuilder()
     builder.button(
         text="Выполнить балансировку", callback_data=ActionsCallbackFactory(action="rebalance")
+    )
+    builder.button(
+        text="Проверить облигации", callback_data=ActionsCallbackFactory(action="check_bonds")
     )
     builder.button(
         text="Изменить привязку", callback_data=ActionsCallbackFactory(action="relinked")
@@ -82,16 +89,16 @@ def get_indices_keys(indices: List[Tuple[str, str]]):
 
 #region Message
 
-async def welcome_user_answer(message: Message, links: UserLinksConfig, message_header: str = None):
+async def welcome_user_answer(message: Message, index_bindings: UserIndexBindingsConfig, message_header: str = None):
     mes = Template(welcome_user).substitute(
-        account_name=links.broker_account_name,
-        index_name=links.index_name
+        account_name=index_bindings.broker_account_name,
+        index_name=index_bindings.index_name
     )
     if message_header:
         mes = message_header + mes
     await message.answer(mes, reply_markup=get_actions_keys())
 
-async def change_user_links_answer(message: Message, accounts: List[Account], message_header: str = None):
+async def change_user_index_bindings_answer(message: Message, accounts: List[Account], message_header: str = None):
     """
     Формирует и отправляет сообщение по шаблону для настройки связки между аккаунтом пользователя и индексом Мосбиржи
     :param message: Сообщение для ответа и отправки сообщения
@@ -153,8 +160,8 @@ async def user_settings_message(message: Message, user_settings: UserConfig):
     last_run = user_settings.schedule.last_run.date()
     mes = Template(user_settings_text_template).substitute(
         telegram_id=user_settings.telegram_id,
-        broker_account_name=user_settings.links.broker_account_name,
-        index_name=user_settings.links.index_name,
+        broker_account_name=user_settings.index_bindings.broker_account_name,
+        index_name=user_settings.index_bindings.index_name,
         rebalance_frequency=frequency.value,
         last_run=last_run
     )

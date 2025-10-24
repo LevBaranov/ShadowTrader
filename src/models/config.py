@@ -26,7 +26,7 @@ class TelegramConfig(BaseModel):
     token: str
 
 
-class UserLinksConfig(BaseModel):
+class UserIndexBindingsConfig(BaseModel):
     broker_account_id: str = None
     broker_account_name: str = None
     index_name: str = None
@@ -39,7 +39,7 @@ class UserScheduleConfig(BaseModel):
 
 class UserConfig(BaseModel):
     telegram_id: int
-    links: UserLinksConfig = None
+    index_bindings: UserIndexBindingsConfig = None
     schedule: UserScheduleConfig = None
 
 

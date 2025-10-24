@@ -3,7 +3,7 @@ import toml
 from pathlib import Path
 from datetime import datetime
 
-from src.models.config import AppConfig, UserLinksConfig, UserScheduleConfig
+from src.models.config import AppConfig, UserIndexBindingsConfig, UserScheduleConfig
 
 
 ENV = os.getenv("APP_ENV", "prod")
@@ -33,14 +33,14 @@ class ConfigLoader:
 
         for user in cls.config.users:
             if user.telegram_id == user_id:
-                if user.links:
-                    user.links=UserLinksConfig(
+                if user.index_bindings:
+                    user.index_bindings=UserIndexBindingsConfig(
                         broker_account_id=account_id,
                         broker_account_name=account_name,
-                        index_name=user.links.index_name
+                        index_name=user.index_bindings.index_name
                     )
                 else:
-                    user.links = UserLinksConfig(
+                    user.index_bindings = UserIndexBindingsConfig(
                         broker_account_id=account_id,
                         broker_account_name=account_name
                     )
@@ -67,14 +67,14 @@ class ConfigLoader:
                               index_name: str):
         for user in cls.config.users:
             if user.telegram_id == user_id:
-                if user.links:
-                    user.links = UserLinksConfig(
-                        broker_account_id=user.links.broker_account_id,
-                        broker_account_name=user.links.broker_account_name,
+                if user.index_bindings:
+                    user.index_bindings = UserIndexBindingsConfig(
+                        broker_account_id=user.index_bindings.broker_account_id,
+                        broker_account_name=user.index_bindings.broker_account_name,
                         index_name=index_name
                     )
                 else:
-                    user.links = UserLinksConfig(
+                    user.index_bindings = UserIndexBindingsConfig(
                         index_name=index_name
                     )
 

@@ -55,14 +55,14 @@ class Scheduler:
 
     async def _rebalance(self, user):
 
-            account_id = user.links.broker_account_id
+            account_id = user.index_bindings.broker_account_id
 
             manager = PortfolioManager(account_id)
             portfolio = manager.get_portfolio()
 
             balance_before_balance = portfolio.cash.to_float()
             if balance_before_balance > settings.balancer.max_cash:
-                index_moex = manager.get_index_list(user.links.index_name)
+                index_moex = manager.get_index_list(user.index_bindings.index_name)
                 actions, new_balance = manager.get_action_for_rebalance(portfolio, index_moex)  # Для обновления списка действий
                 success_action_list, error_action_list = manager.execute_actions()
 
