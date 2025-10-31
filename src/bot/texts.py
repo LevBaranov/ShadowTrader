@@ -20,3 +20,10 @@ user_settings_text_template = """Пользователь: $telegram_id
 Расписание настроено: $rebalance_frequency
 Последняя балансировка была: $last_run
 """
+callable_bonds_head_template = "Тикер - Название - Дата оферты"
+callable_bonds_text_template = "$ticker - $name - $offer_date "
+bonds_reminder_template = "Напоминание о событиях по облигациям включено"
+callable_bonds_account_selecting_template = """Выберете счёт брокера на котором необходимо отслеживать облигации.
+Кол-во счетов обнаружено: $accounts_count
+"""
+callable_bonds_account_selected_template = "Счёт брокера для отслеживания облигации обновлён."

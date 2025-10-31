@@ -123,8 +123,17 @@ class PortfolioManager:
 
         return success_action_list, error_action_list
 
-    def get_callable_bonds(self, account_id: str = None):
+    def get_callable_bonds(self, account_id: str = None) -> list[Bond]:
+        """
+        Возвращает список облигаций пользователя, по которым известна дата оферты.
 
+        * Получаем список всех облигаций у Мосбиржи.
+        * Оставляем только с датой оферты.
+        * Получаем облигации на аккаунте брокера.
+        * Фильтруем облигации на аккаунте, оставляем только те, по которым известна дата оферты.
+        :param account_id: Идентификатор аккаунта пользователя в формате uuid.
+        :return: Список облигаций.
+        """
         if not self.account_client:
             if not account_id:
                 raise ValueError("Account client is not initialized and account_id is not provided")
