@@ -3,6 +3,7 @@ import requests
 from src.config import settings
 
 from src.models.index import Index, IndexItem
+from src.models.bond import MoexBond
 from src.models.error import Error
 
 
@@ -112,10 +113,29 @@ class Moex:
 
         return result
 
+    def get_bonds(self) -> list[MoexBond]:
+        """
+        Возвращает список облигаций с Мосбиржи
+        :return: Список облигаций
+        """
+
+        url = f"{self.base_url}/engines/stock/markets/bonds/securities.json"
+        params = {
+            # "limit": self.limit,
+            "start": 0,
+            "securities.columns":
+                "SECID,SHORTNAME,BOARDNAME,LOTVALUE,OFFERDATE,CALLOPTIONDATE,PUTOPTIONDATE,BUYBACKPRICE",
+        }
+        data = self._fetch_json(url, params)
+        result = [ MoexBond(*sec) for sec in data.get("securities", {}).get("data", [])]
+
+        return result
+
+
 
 
 if __name__ == "__main__":
     m = Moex()
-    index_moex = m.get_indices()
-    print(index_moex)
-    print(len(index_moex))
+    bonds = m.get_bonds()
+    print(bonds)
+    print(len(bonds))

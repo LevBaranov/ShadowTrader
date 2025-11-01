@@ -4,6 +4,7 @@ from typing import List, Tuple, Dict, Optional
 from src.core.balancer import Balancer
 
 from src.models.account import Account
+from src.models.bond import MoexBond, Bond
 from src.models.positions import Positions
 from src.models.action import Action
 from src.models.error import Error
@@ -122,19 +123,65 @@ class PortfolioManager:
 
         return success_action_list, error_action_list
 
+    def get_callable_bonds(self, account_id: str = None) -> list[Bond]:
+        """
+        Возвращает список облигаций пользователя, по которым известна дата оферты.
+
+        * Получаем список всех облигаций у Мосбиржи.
+        * Оставляем только с датой оферты.
+        * Получаем облигации на аккаунте брокера.
+        * Фильтруем облигации на аккаунте, оставляем только те, по которым известна дата оферты.
+        :param account_id: Идентификатор аккаунта пользователя в формате uuid.
+        :return: Список облигаций.
+        """
+        if not self.account_client:
+            if not account_id:
+                raise ValueError("Account client is not initialized and account_id is not provided")
+            self.set_account(account_id)
+        elif account_id and self.account_client.account_id != account_id:
+            self.set_account(account_id)
+
+        moex_bonds: list[MoexBond] = self.moex.get_bonds()
+        moex_bonds_by_tickers = { _moex_bond.ticker : _moex_bond for _moex_bond in moex_bonds if _moex_bond.offer_date }
+        portfolio_bonds = self.account_client.get_positions().bonds
+
+        callable_bonds = []
+        for _portfolio_bond in portfolio_bonds:
+            if _portfolio_bond.ticker in moex_bonds_by_tickers.keys():
+
+                callable_bonds.append(
+                    Bond(
+                        uid=_portfolio_bond.uid,
+                        figi=_portfolio_bond.figi,
+                        ticker=_portfolio_bond.ticker,
+                        lot_size=_portfolio_bond.lot_size,
+                        type=_portfolio_bond.type,
+                        isin=None,
+                        offer_date=moex_bonds_by_tickers[_portfolio_bond.ticker].offer_date,
+                        call_option_date=moex_bonds_by_tickers[_portfolio_bond.ticker].call_option_date,
+                        put_option_date=moex_bonds_by_tickers[_portfolio_bond.ticker].put_option_date,
+                        buy_back_price=moex_bonds_by_tickers[_portfolio_bond.ticker].buy_back_price
+                    )
+                )
+
+        return callable_bonds
+
 if __name__ == "__main__":
     import pprint
     manager = PortfolioManager()
 
     account = manager.get_user_accounts()[0]
 
-    portfolio = manager.get_portfolio(account.id)
-    pprint.pprint(portfolio)
-    index_moex = manager.get_index_list("IMOEX")
-
-    actions, cash = manager.get_action_for_rebalance(portfolio, index_moex)
-    pprint.pprint(actions)
-    pprint.pprint(cash)
+    # portfolio = manager.get_portfolio(account.id)
+    # pprint.pprint(portfolio)
+    # index_moex = manager.get_index_list("IMOEX")
+    #
+    # actions, cash = manager.get_action_for_rebalance(portfolio, index_moex)
+    # pprint.pprint(actions)
+    # pprint.pprint(cash)
 
     # success_action_list, error_action_list = manager.execute_actions()
     # print(f"{success_action_list, error_action_list}")
+
+    bonds = manager.get_callable_bonds(account.id)
+    pprint.pprint(bonds)

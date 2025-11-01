@@ -26,21 +26,27 @@ class TelegramConfig(BaseModel):
     token: str
 
 
-class UserLinksConfig(BaseModel):
+class BrokerAccountConfig(BaseModel):
     broker_account_id: str = None
     broker_account_name: str = None
+
+
+class UserIndexBindingsConfig(BrokerAccountConfig):
     index_name: str = None
 
 
 class UserScheduleConfig(BaseModel):
     last_run: datetime = None
     rebalance_frequency: str = None
+    enable_bond_reminder: bool = False
+    bond_reminder_last_run: datetime = None
 
 
 class UserConfig(BaseModel):
     telegram_id: int
-    links: UserLinksConfig = None
+    index_bindings: UserIndexBindingsConfig = None
     schedule: UserScheduleConfig = None
+    bonds_account: BrokerAccountConfig = None
 
 
 class LoggingConfig(BaseModel):

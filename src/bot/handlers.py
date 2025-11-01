@@ -9,8 +9,8 @@ from src.core.portfolio_manager import PortfolioManager
 from src.config import settings
 
 from src.bot.texts import welcome_head
-from src.bot.utils import check_links_exist
-from src.bot.ui import welcome_user_answer, change_user_links_answer, user_settings_message
+from src.bot.utils import check_index_bindings_exist
+from src.bot.ui import welcome_user_answer, change_user_index_bindings_answer, user_settings_message
 
 
 router = Router()
@@ -21,13 +21,13 @@ router.message.filter(F.chat.id.in_([user.telegram_id for user in settings.users
 async def cmd_start(message: Message):
 
 
-    links = check_links_exist(message.from_user.id)
-    if links:
-        await welcome_user_answer(message, links, welcome_head)
+    index_bindings = check_index_bindings_exist(message.from_user.id)
+    if index_bindings:
+        await welcome_user_answer(message, index_bindings, welcome_head)
     else:
         manager = PortfolioManager()
         accounts = manager.get_user_accounts()
-        await change_user_links_answer(message, accounts, welcome_head)
+        await change_user_index_bindings_answer(message, accounts, welcome_head)
 
 
 @router.message(Command("settings"))
@@ -41,11 +41,11 @@ async def cmd_settings(message: Message):
     :return:
     """
 
-    links = check_links_exist(message.from_user.id)
-    if links:
+    index_bindings = check_index_bindings_exist(message.from_user.id)
+    if index_bindings:
         user_settings = [user for user in settings.users if user.telegram_id == message.from_user.id][0]
         await user_settings_message(message, user_settings)
     else:
         manager = PortfolioManager()
         accounts = manager.get_user_accounts()
-        await change_user_links_answer(message, accounts, welcome_head)
+        await change_user_index_bindings_answer(message, accounts, welcome_head)
