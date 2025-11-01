@@ -33,21 +33,32 @@ class Scheduler:
 
         self.bot = bot
 
-    async def _send_report(self, chat_id, success_action_list, error_action_list):
+    async def _send_report(self, chat_id, type_report, **data):
 
         if self.bot:
 
             head = "Я тут немного 'пошуршал' пока ты не видел.\n"
-            message = head + "Успешно:\n" + "\n".join( [
-                f"Действие: {act.type}, Акция: {act.share.ticker}, Кол-во: {act.quantity}"
-                for act in success_action_list
-            ])
-            if len(error_action_list) > 0:
-                error_message = "Ошибки:\n" + "\n".join( [
-                    f"При выполнении действия с {error.data.share.ticker} ошибка: {error.description}"
-                    for error in error_action_list
+            if type_report == "rebalance":
+
+                success_action_list = data.get("success_action_list")
+                error_action_list = data.get("error_action_list")
+
+                message = head + "Успешно:\n" + "\n".join( [
+                    f"Действие: {act.type}, Акция: {act.share.ticker}, Кол-во: {act.quantity}"
+                    for act in success_action_list
                 ])
-                message = f"{message}\n{error_message}"
+                if len(error_action_list) > 0:
+                    error_message = "Ошибки:\n" + "\n".join( [
+                        f"При выполнении действия с {error.data.share.ticker} ошибка: {error.description}"
+                        for error in error_action_list
+                    ])
+                    message = f"{message}\n{error_message}"
+            else:  # get_callable_bonds
+                callable_bonds = data.get("callable_bonds")
+                message = head + "Тикер - Название - Дата оферты\n" + "\n".join( [
+                    f"{_bond.ticker} - {_bond.figi} - {_bond.offer_date} "
+                    for _bond in callable_bonds
+                ])
 
             return await self.bot.send_message(chat_id, message)
 
@@ -66,13 +77,29 @@ class Scheduler:
                 actions, new_balance = manager.get_action_for_rebalance(portfolio, index_moex)  # Для обновления списка действий
                 success_action_list, error_action_list = manager.execute_actions()
 
-                await self._send_report(user.telegram_id, success_action_list, error_action_list)
+                await self._send_report(user.telegram_id, "rebalance",
+                                        success_action_list=success_action_list,
+                                        error_action_list=error_action_list)
                 _save_result(success_action_list)
                 _save_result(error_action_list)
 
                 ConfigLoader.update_schedule(user.telegram_id, user.schedule.rebalance_frequency)
 
             await asyncio.sleep(settings.scheduler.timeout_in_sec)
+
+    async def _get_callable_bonds(self, user):
+
+        account_id = user.index_bindings.broker_account_id
+        manager = PortfolioManager(account_id)
+        now = datetime.now()
+        callable_bonds = [ _bond for _bond in manager.get_callable_bonds()
+                           if datetime.strptime(_bond.offer_date, "%Y-%m-%d") - now <= timedelta(weeks=2)
+                        ]
+        if callable_bonds:
+            await self._send_report(user.telegram_id, "get_callable_bonds", callable_bonds=callable_bonds)
+            _save_result(callable_bonds)
+        ConfigLoader.change_bond_reminder_last_run(user.telegram_id, now)
+
 
 
     async def run(self):
@@ -93,7 +120,14 @@ class Scheduler:
 
         while True:
             for user in settings.users:
-                if user.schedule and should_rebalance(user.schedule.last_run, user.schedule.rebalance_frequency):
-                    await self._rebalance(user)
+                if user.schedule:
+                    if should_rebalance(user.schedule.last_run, user.schedule.rebalance_frequency):
+                        await self._rebalance(user)
+
+                    if (user.schedule.enable_bond_reminder
+                            and should_rebalance(user.schedule.bond_reminder_last_run, ScheduleFrequency.WEEKLY.name)):
+
+                        await self._get_callable_bonds(user)
+
 
             await asyncio.sleep(settings.scheduler.timeout_in_sec)
