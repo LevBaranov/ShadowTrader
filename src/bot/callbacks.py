@@ -42,6 +42,11 @@ async def callbacks_account(
         await tracking_index_setting_message(callback.message, manager.get_indices_list())
     elif callback_data.target == "bonds_account":
         await callable_bonds_account_selected_message(callback.message)
+
+        user = [user for user in settings.users if user.telegram_id == callback.from_user.id][0]
+        callable_bonds = manager.get_callable_bonds(account_id)
+        reminder_state = user.schedule.enable_bond_reminder
+        await account_callable_bonds_message(callback.message, callable_bonds, reminder_state, account_id)
     await callback.answer()
 
 

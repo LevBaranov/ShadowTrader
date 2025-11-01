@@ -106,7 +106,7 @@ def get_reminder_and_bonds_account_keys(reminder_state: bool, account_id: str) -
     :return: Клавиатура
     """
     builder = InlineKeyboardBuilder()
-    if reminder_state:
+    if not reminder_state:
         new_state = "Включить"
     else:
         new_state = "Отключить"
