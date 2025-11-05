@@ -10,6 +10,7 @@ from src.bot.texts import set_scheduler, set_tracking_index
 from src.bot.texts import user_settings_text_template, bonds_reminder_template
 from src.bot.texts import callable_bonds_head_template, callable_bonds_text_template
 from src.bot.texts import callable_bonds_account_selecting_template, callable_bonds_account_selected_template
+from src.bot.texts import user_settings_text_template_with_bonds
 
 from src.bot.utils import AccountCallbackFactory, BalanceActionsCallbackFactory, ActionsCallbackFactory
 from src.bot.utils import ScheduleCallbackFactory, SetIndexCallbackFactory
@@ -211,6 +212,21 @@ async def user_settings_message(message: Message, user_settings: UserConfig):
         rebalance_frequency=frequency.value,
         last_run=last_run
     )
+
+    if user_settings.bonds_account:
+        bonds_broker_account_name = user_settings.bonds_account.broker_account_name
+        enable_bond_reminder = user_settings.schedule.enable_bond_reminder
+        if enable_bond_reminder:
+            bonds_reminder_last_run = user_settings.schedule.bond_reminder_last_run.date()
+        else:
+            bonds_reminder_last_run = "Отслеживание не включено"
+
+        mes = mes + Template(user_settings_text_template_with_bonds).substitute(
+            bonds_broker_account_name=bonds_broker_account_name,
+            bonds_reminder_last_run=bonds_reminder_last_run
+        )
+
+
     await message.answer(mes)
 
 async def account_callable_bonds_message(message: Message,
