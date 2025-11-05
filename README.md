@@ -42,7 +42,7 @@ docker run --rm -it  \
     -v $(pwd)/prod.toml:/prod.toml   \
     -v $(pwd)/scheduler_results:/scheduler_results   \
     -v $(pwd)/logs:/src/bot/logs   \
-    shadowtrader:latest
+    ghcr.io/levbaranov/shadowtrader:latest
 ```
 
 ## Текущая архитектура

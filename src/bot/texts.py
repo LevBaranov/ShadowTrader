@@ -20,6 +20,10 @@ user_settings_text_template = """Пользователь: $telegram_id
 Расписание настроено: $rebalance_frequency
 Последняя балансировка была: $last_run
 """
+user_settings_text_template_with_bonds = """
+Облигации проверял на аккаунте: $bonds_broker_account_name
+Последний раз проверял состояние облигаций: $bonds_reminder_last_run 
+"""
 callable_bonds_head_template = "Тикер - Название - Дата оферты"
 callable_bonds_text_template = "$ticker - $name - $offer_date "
 bonds_reminder_template = "Напоминание о событиях по облигациям включено"
