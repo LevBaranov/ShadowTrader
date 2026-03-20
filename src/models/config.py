@@ -39,7 +39,6 @@ class UserScheduleConfig(BaseModel):
     last_run: datetime = None
     rebalance_frequency: str = None
     enable_bond_reminder: bool = False
-    bond_reminder_last_run: datetime = None
 
 
 class UserConfig(BaseModel):

@@ -10,7 +10,7 @@ from src.models.config import AppConfig, UserIndexBindingsConfig, UserScheduleCo
 
 
 ENV = os.getenv("APP_ENV", "prod")
-CONFIG_FILE_PATH = os.getenv("APP_CONFIG_FILE_PATH", "/")
+CONFIG_FILE_PATH = os.getenv("APP_CONFIG_FILE_PATH", "/app/")
 config_file = Path(f"{CONFIG_FILE_PATH}{ENV}.toml")
 
 
@@ -108,34 +108,12 @@ class ConfigLoader:
         :param user_id: Идентификатор пользователя, которому меняем конфигурацию.
         :param is_enabled: Флаг включения/выключения, который будет проставлен.
         """
-        if is_enabled:
-            new_data = {
-                "enable_bond_reminder": is_enabled,
-                "bond_reminder_last_run": datetime.now()
-            }
-        else:
-            new_data = {
-                "enable_bond_reminder": is_enabled
-            }
+        new_data = {
+            "enable_bond_reminder": is_enabled
+        }
         cls._update_user_field(
             user_id=user_id,
             field="schedule",
             new_data=new_data,
-            model_cls=UserScheduleConfig
-        )
-
-    @classmethod
-    def change_bond_reminder_last_run(cls, user_id: int, last_run: datetime = None):
-        """
-        Изменение дату последнего запуска проверки облигаций на близость корпоративного действия.
-        :param user_id: Идентификатор пользователя, которому меняем конфигурацию.
-        :param last_run: Дата последнего запуска проверки облигаций на близость корпоративного действия.
-        """
-        if not last_run:
-            last_run = datetime.now()
-        cls._update_user_field(
-            user_id=user_id,
-            field="schedule",
-            new_data={"bond_reminder_last_run": last_run},
             model_cls=UserScheduleConfig
         )

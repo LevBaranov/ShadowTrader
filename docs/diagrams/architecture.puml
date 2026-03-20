@@ -18,6 +18,7 @@ System_Boundary(app, "ShadowTrader") {
     Container(config, "config", "Container", "Загрузчик конфигурации")
 
     Container(models, "models", "Container", "Сущности и объекты")
+    Container(db, "db", "Container", "Объекты для работы с БД")
 }
 
 ' Внешние системы (облачка)
@@ -40,7 +41,9 @@ Rel(bot, models, "Формирует модели")
 Rel(core, services, "Использует для данных и заявок")
 Rel(core, config, "Читает настройки")
 Rel(core, models, "Формирует модели")
+Rel(core, db, "Получает объекты")
 Rel(config, models, "Формирует объекты конфигурации")
+Rel(config, db, "Формирует объекты конфигурации")
 
 Rel(services, moex, "Запрашивает котировки")
 Rel(services, tbank, "Управляет позициями и заявками")
