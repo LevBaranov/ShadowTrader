@@ -3,8 +3,8 @@ from typing import List, Dict, Optional
 from contextlib import contextmanager
 from dataclasses import asdict
 
-from tinkoff.invest import Client, OrderDirection, OrderType, RequestError
-from tinkoff.invest.constants import INVEST_GRPC_API_SANDBOX
+from t_tech.invest import Client, OrderDirection, OrderType, RequestError
+from t_tech.invest.constants import INVEST_GRPC_API_SANDBOX
 
 from src.config import settings
 from src.models.instrument import InstrumentBase
@@ -251,9 +251,44 @@ if __name__ == "__main__":
     br = TBroker()
     # print(br.find_share("SBER", "ticker"))
     # pprint.pprint(br.get_all_shares())
+    ####################################
+    ### For sandbox method create account
+    ####################################
+    # from decimal import Decimal
+    # from tinkoff.invest import MoneyValue
+    # from tinkoff.invest.utils import decimal_to_quotation
+    #
+    # with br.get_client() as client:
+    #     account = client.sandbox.open_sandbox_account()
+    #     print(account)
+    #     money = decimal_to_quotation(Decimal(10000))
+    #     client.sandbox.sandbox_pay_in(
+    #         account_id=account.account_id,
+    #         amount=MoneyValue(units=money.units,
+    #                           nano=money.nano,
+    #                           currency='rub'),
+    #     )
+    #####################################
     accs = br.get_all_accounts()
     print(accs)
-
     ac = TAccount(accs[0].id, br)
+    ####################################
+    ### For sandbox method create order
+    ####################################
+    # instr = br.find_instrument("RU000A105SK4", "ticker")
+    # print(f"{instr=}")
+    # with br.get_client() as client:
+    #     try:
+    #         client.orders.post_order(
+    #             instrument_id="e022255e-fd8a-420a-bb13-ff7ddd10157c",       #e022255e-fd8a-420a-bb13-ff7ddd10157c
+    #             quantity=1,
+    #             # price=price,
+    #             direction=OrderDirection.ORDER_DIRECTION_BUY,
+    #             account_id=ac.account_id,
+    #             order_type=OrderType.ORDER_TYPE_BESTPRICE,  # TODO: Добавить другие типы
+    #             # order_id=order_id
+    #         )
+    #     except RequestError as e:
+    #         print(f"Order failed: {e}")
     pos = ac.get_positions()
     print(pos)

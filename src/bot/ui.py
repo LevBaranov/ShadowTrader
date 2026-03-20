@@ -197,11 +197,14 @@ async def tracking_index_setting_message(message: Message, indices: List[Tuple[s
 
     await message.answer(set_tracking_index, reply_markup=get_indices_keys(indices))
 
-async def user_settings_message(message: Message, user_settings: UserConfig):
+async def user_settings_message(message: Message,
+                                user_settings: UserConfig,
+                                bond_last_checked_date: datetime | None = None):
     """
     Формирует и отправляет сообщение по шаблону с настройками пользователя
     :param message: Сообщение, на которое необходимо ответить.
     :param user_settings: Пользовательские настройки
+    :param bond_last_checked_date: Дата последней успешной проверки облигаций
     """
     frequency = ScheduleFrequency[user_settings.schedule.rebalance_frequency]
     last_run = user_settings.schedule.last_run.date()
@@ -213,11 +216,10 @@ async def user_settings_message(message: Message, user_settings: UserConfig):
         last_run=last_run
     )
 
-    if user_settings.bonds_account:
+    if user_settings.schedule.enable_bond_reminder:
         bonds_broker_account_name = user_settings.bonds_account.broker_account_name
-        enable_bond_reminder = user_settings.schedule.enable_bond_reminder
-        if enable_bond_reminder:
-            bonds_reminder_last_run = user_settings.schedule.bond_reminder_last_run.date()
+        if bond_last_checked_date:
+            bonds_reminder_last_run = bond_last_checked_date.date()
         else:
             bonds_reminder_last_run = "Отслеживание не включено"
 

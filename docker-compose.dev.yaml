@@ -1,0 +1,58 @@
+services:
+  db:
+    image: postgres:18
+    container_name: postgres_container
+    environment:
+      POSTGRES_USER: postgres_user
+      POSTGRES_PASSWORD: postgres_password
+      POSTGRES_DB: postgres_db
+      PGDATA: /var/lib/postgresql/data/pgdata
+    ports:
+      - 54321:5432
+    volumes:
+      - pgdata:/var/lib/postgresql/data/pgdata
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U postgres_user -d postgres_db"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 10s
+    restart: unless-stopped
+
+  base: &base
+    build:
+      context: .
+      dockerfile: ./Dockerfile
+    env_file: .env
+    volumes:
+      - .:/app
+      - ./dev.toml:/dev.toml
+    image: shadowtrader:dev
+
+  migrations:
+    <<: *base
+    image: shadowtrader:dev
+    depends_on:
+      db:
+        condition: service_healthy
+    command: sh -c "alembic upgrade head"
+
+  app:
+    <<: *base
+    image: shadowtrader:dev
+    container_name: shadowtrader_app_dev
+    depends_on:
+      db:
+        condition: service_healthy
+      migrations:
+        condition: service_completed_successfully
+    volumes:
+      - ./logs:/app/src/bot/logs
+      - ./scheduler_results:/scheduler_results
+    env_file: .env
+    command: python src/main.py
+    restart: unless-stopped
+
+volumes:
+  pgdata:
+    driver: local

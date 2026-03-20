@@ -34,15 +34,10 @@ wget -O prod.toml https://raw.githubusercontent.com/LevBaranov/ShadowTrader/refs
 mkdir scheduler_results
 mkdir logs
 ```
-### 4. Соберите образ
-Скачайте образ контейнера и запустите:
+### 4. Запуск
+Запустите контейнеры:
 ```commandline
-docker pull ghcr.io/levbaranov/shadowtrader:latest
-docker run --rm -it  \
-    -v $(pwd)/prod.toml:/prod.toml   \
-    -v $(pwd)/scheduler_results:/scheduler_results   \
-    -v $(pwd)/logs:/src/bot/logs   \
-    ghcr.io/levbaranov/shadowtrader:latest
+docker compose up -d
 ```
 
 ## Текущая архитектура

@@ -26,7 +26,7 @@ class TestTBroker:
 
     def test_init_with_default_settings(self):
         from src.config import settings
-        from tinkoff.invest.constants import INVEST_GRPC_API_SANDBOX
+        from t_tech.invest.constants import INVEST_GRPC_API_SANDBOX
         from src.services.broker import TBroker
 
         broker = TBroker()
@@ -164,7 +164,7 @@ class TestTAccount:
     def test_create_order_buy(self):
         from src.services.broker import TAccount
         from src.models.action import Action
-        from tinkoff.invest import OrderDirection
+        from t_tech.invest import OrderDirection
 
         broker = MagicMock()
         client = MagicMock()
@@ -185,7 +185,7 @@ class TestTAccount:
     def test_create_order_error(self):
         from src.services.broker import TAccount
         from src.models.action import Action
-        from tinkoff.invest import RequestError
+        from t_tech.invest import RequestError
 
         broker = MagicMock()
         client = MagicMock()

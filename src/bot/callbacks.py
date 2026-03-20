@@ -17,6 +17,13 @@ from src.bot.ui import change_user_index_bindings_answer, portfolio_structure_me
 from src.bot.ui import account_callable_bonds_message, bonds_reminder_enabling_message
 from src.bot.ui import callable_bonds_account_selecting_message, callable_bonds_account_selected_message
 
+
+from src.db.repositories.user_repository import UserRepository
+from src.models.scheduler_frequency import ScheduleFrequency
+from src.db.database import get_session
+from src.db.repositories.task_repository import TaskRepository
+from src.db.enums import TaskType
+
 router = Router()
 router.callback_query.filter(F.from_user.id.in_([user.telegram_id for user in settings.users]))
 
@@ -149,10 +156,40 @@ async def callbacks_reminder(
         callback_data: ReminderCallbackFactory
 ):
     """
-    Ловим callback с командой о включении/выключении напоминания и обновляем конфигурацию.
+    Ловим callback с командой о включении/выключении напоминания.
+    Если требуется включить отслеживание, создаём задачу на отслеживание в БД.
+    Если требуется отключить отслеживание, отключаем найденную задачу на отслеживание в БД
+    После этого обновляем конфигурацию.
     :param callback:
     :param callback_data:
     """
+
+    user_conf = [user for user in settings.users if user.telegram_id == callback.from_user.id][0]
+    params = dict(broker_account_id=user_conf.bonds_account.broker_account_id)
+
+    async for session in get_session():
+        repo = TaskRepository(session)
+        user_repo = UserRepository(session)
+        user = await user_repo.get_user_by_telegram_id(callback.from_user.id)
+        if user:
+            if callback_data.enabled:
+
+                await repo.create_task(
+                    task_type=TaskType.BOND_EVENTS_MONITOR,
+                    frequency=ScheduleFrequency.WEEKLY,
+                    user=user,
+                    params=params
+                )
+            else:
+                tasks = await repo.get_user_tasks(
+                    user_telegram_id=callback.from_user.id,
+                    broker_account_id=user_conf.bonds_account.broker_account_id
+                )
+
+                await repo.disable_task(
+                    task_id=tasks[0].id
+                )
+
 
     ConfigLoader.change_bond_reminder_state(callback.from_user.id, callback_data.enabled)
     updated_settings = ConfigLoader.config

@@ -1,14 +1,20 @@
 import os
 from datetime import datetime, timedelta
 import asyncio
+import logging
 
 from aiogram import Bot
+from aiogram.types import Message
 
 from src.core.portfolio_manager import PortfolioManager
 from src.config import settings, ConfigLoader
+from src.db.repositories.user_repository import UserRepository
 
 from src.models.scheduler_frequency import ScheduleFrequency
 
+from src.db.database import get_session
+from src.db.repositories.task_repository import TaskRepository
+from src.db.enums import TaskType
 
 def _save_result(obj: list):
     if not obj:
@@ -25,6 +31,7 @@ def _save_result(obj: list):
         for item in obj:
             f.write(f"[{datetime.now()}] {str(item)}\n")
 
+logger = logging.getLogger(__name__)
 
 class Scheduler:
 
@@ -33,7 +40,7 @@ class Scheduler:
 
         self.bot = bot
 
-    async def _send_report(self, chat_id, type_report, **data):
+    async def _send_report(self, chat_id, type_report, **data) -> Message | None:
 
         if self.bot:
 
@@ -87,19 +94,22 @@ class Scheduler:
 
             await asyncio.sleep(settings.scheduler.timeout_in_sec)
 
-    async def _get_callable_bonds(self, user):
+    async def _get_callable_bonds(self, telegram_id, broker_account_id):
 
-        account_id = user.index_bindings.broker_account_id
-        manager = PortfolioManager(account_id)
+        manager = PortfolioManager(broker_account_id)
         now = datetime.now()
         callable_bonds = [ _bond for _bond in manager.get_callable_bonds()
                            if datetime.strptime(_bond.offer_date, "%Y-%m-%d") - now <= timedelta(weeks=2)
                         ]
         if callable_bonds:
-            await self._send_report(user.telegram_id, "get_callable_bonds", callable_bonds=callable_bonds)
+            results = await self._send_report(telegram_id, "get_callable_bonds", callable_bonds=callable_bonds)
+            if isinstance(results, Message):
+                results = results.model_dump_json()
             _save_result(callable_bonds)
-        ConfigLoader.change_bond_reminder_last_run(user.telegram_id, now)
+        else:
+            results = "No suitable bonds were found"
 
+        return results
 
 
     async def run(self):
@@ -124,10 +134,73 @@ class Scheduler:
                     if should_rebalance(user.schedule.last_run, user.schedule.rebalance_frequency):
                         await self._rebalance(user)
 
-                    if (user.schedule.enable_bond_reminder
-                            and should_rebalance(user.schedule.bond_reminder_last_run, ScheduleFrequency.WEEKLY.name)):
+            async for session in get_session():
+                repo = TaskRepository(session)
+                tasks = await repo.get_tasks()
 
-                        await self._get_callable_bonds(user)
+                for task in tasks:
+                    if not task.disabled_date:
+                        try:
+                            if should_rebalance(task.last_checked_date, task.frequency.name):
+                                if task.task_type == TaskType.BOND_EVENTS_MONITOR:
+                                    if not task.params:
+                                        await repo.save_result(
+                                            task.id,
+                                            result="failed",
+                                            errors=f"Don't have params for {task.task_type}"
+                                        )
+                                    else:
+                                        broker_account_id = task.params.get("broker_account_id")
+                                        result = await self._get_callable_bonds(task.user.telegram_id, broker_account_id)
+                                        if result:
+                                            await repo.save_result(
+                                                task.id,
+                                                result=result
+                                            )
+                                        else:
+                                            await repo.save_result(
+                                                task.id,
+                                                result="failed",
+                                                errors=f"Method send report return 'None' result"
+                                            )
 
+                        except Exception as e:
+
+                            logger.exception("Task failed")
+
+                            await repo.save_result(
+                                task.id,
+                                result="failed",
+                                errors=str(e)
+                            )
 
             await asyncio.sleep(settings.scheduler.timeout_in_sec)
+
+if __name__ == "__main__":
+    async def scheduler_loop():
+        telegram_token = settings.telegram.token
+        bot = Bot(token=telegram_token)
+        scheduler = Scheduler(bot)
+
+        while True:
+            await scheduler.run()
+            await asyncio.sleep(settings.scheduler.timeout_in_sec)
+
+    async def create_test_task():
+
+
+        async for session in get_session():
+            repo = TaskRepository(session)
+            user_repo = UserRepository(session)
+
+            user = await user_repo.get_user_by_telegram_id(190741373)
+            if user:
+                await repo.create_task(
+                    task_type=TaskType.BOND_EVENTS_MONITOR,
+                    frequency=ScheduleFrequency.WEEKLY,
+                    user=user
+
+                )
+
+    # asyncio.run(create_test_task())
+    # asyncio.run(scheduler_loop())
