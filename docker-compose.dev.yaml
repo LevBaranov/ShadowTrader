@@ -1,7 +1,7 @@
 services:
   db:
     image: postgres:18
-    container_name: postgres_container
+    container_name: shadowtrader-postgres-dev
     environment:
       POSTGRES_USER: postgres_user
       POSTGRES_PASSWORD: postgres_password
@@ -19,28 +19,19 @@ services:
       start_period: 10s
     restart: unless-stopped
 
-  base: &base
-    build:
-      context: .
-      dockerfile: ./Dockerfile
-    env_file: .env
-    volumes:
-      - .:/app
-      - ./dev.toml:/dev.toml
-    image: shadowtrader:dev
-
   migrations:
-    <<: *base
-    image: shadowtrader:dev
+    build: .
     depends_on:
       db:
         condition: service_healthy
+    volumes:
+      - ./dev.toml:/app/dev.toml
+    env_file: .env-dev
     command: sh -c "alembic upgrade head"
 
   app:
-    <<: *base
-    image: shadowtrader:dev
-    container_name: shadowtrader_app_dev
+    build: .
+    container_name: shadowtrader-app-dev
     depends_on:
       db:
         condition: service_healthy
@@ -49,7 +40,8 @@ services:
     volumes:
       - ./logs:/app/src/bot/logs
       - ./scheduler_results:/scheduler_results
-    env_file: .env
+      - ./dev.toml:/app/dev.toml
+    env_file: .env-dev
     command: python src/main.py
     restart: unless-stopped
 
