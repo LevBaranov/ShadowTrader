@@ -8,13 +8,18 @@
 > На текущий момент в качестве брокера может быть только Т-банк.
 
 ## Начало работы
-### 1. Скачайте файл конфигурации
-Для запуска бота потребуется сделать копию файла конфигурации:
+### 1. Скачайте файлы требующиеся для запуска образа
+Для запуска бота потребуется сделать файла конфигурации и файл с переменными окружения. Для это стянем примеры из репы:
 ```commandline
 wget -O prod.toml https://raw.githubusercontent.com/LevBaranov/ShadowTrader/refs/heads/master/prod.toml-example
+wget -O .env https://raw.githubusercontent.com/LevBaranov/ShadowTrader/refs/heads/master/.env-example
 ```
-### 2. Сформируйте свою конфигурацию
-Заполните файл конфигурации. Обязательные поля для заполнения:
+Также потребуется `docker-compose.yaml`
+```commandline
+wget -O docker-compose.yaml https://raw.githubusercontent.com/LevBaranov/ShadowTrader/refs/heads/master/docker-compose.yaml
+```
+### 2. Сформируйте свою конфигурацию и переменные окружения
+Заполните файл конфигурации `prod.toml`. Обязательные поля для заполнения:
 * `telegram.token` - токен вашего бота в телеграм
 * `broker.token` - токен для работы с портфелем в Т-банке 
 ([подробнее](https://developer.tbank.ru/invest/intro/intro/token]))
@@ -27,6 +32,8 @@ wget -O prod.toml https://raw.githubusercontent.com/LevBaranov/ShadowTrader/refs
 > блоками через бота.
 > 
 > В версиях 0.2.0 и ниже создавалась связка links. В версиях выше в конфигурации эта сущность имеет имя index_bindings
+
+Заполните в `.env` свои данные для доступа к БД. Не забудьте продублировать их в `docker-compose.yaml`
 
 ### 3. Создайте директорию для логов
 Создайте директорию для логов и результатов выполненных по расписанию.
