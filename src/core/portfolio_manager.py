@@ -9,6 +9,7 @@ from src.models.positions import Positions
 from src.models.action import Action
 from src.models.error import Error
 from src.models.index import  Index
+from src.models.rebalance import RebalancePreview, PortfolioPosition
 
 from src.services.broker import TBroker, TAccount
 from src.services.stock_market import Moex
@@ -165,6 +166,73 @@ class PortfolioManager:
                 )
 
         return callable_bonds
+
+    def calculate_rebalance(self, index_name: str) -> RebalancePreview:
+        """
+        Метод для расчёта действий балансировки, кроме действий возвращает данные по весу внутри портфеля и индекса.
+        :param index_name: Наименование индекса для расчёта
+        :return: Действия, свободные средства и позиции с весом по каждой.
+        """
+
+        portfolio = self.get_portfolio()
+        portfolio_items = { share.ticker: share for share in portfolio.shares }
+
+        index = self.get_index_list(index_name)
+        index_items = { item.ticker: item for item in index.items }
+
+        self.actions = []
+
+        balancer = Balancer(portfolio, index)
+        actions_list, free_cash = balancer.calculate_actions()
+
+        offers = dict()
+        for action in actions_list:
+            share = self.broker.find_share(action.get("ticker"), "ticker")
+            self.actions.append(Action(type=action.get("type"), quantity=action.get("quantity"), share=share))
+
+            offers[share.ticker] = action.get("quantity")
+
+
+        positions = []
+
+        for position in balancer.calculated_positions:
+
+            portfolio_share = portfolio_items.get( position.ticker )
+
+            index_share = index_items.get( position.ticker )
+
+            uid = ""
+
+            if portfolio_share:
+                uid = portfolio_share.uid
+
+            elif index_share:
+                found_share = self.broker.find_share( position.ticker,"ticker" )
+
+                uid = found_share.uid
+
+            positions.append(
+                PortfolioPosition(
+                    uid=uid,
+                    ticker=position.ticker,
+                    name=(
+                        index_share.shortnames
+                        if index_share
+                        else position.ticker
+                    ),
+                    index_weight=round(position.target_weight * 100, 2),
+                    portfolio_weight=round(position.current_weight * 100, 2),
+                    portfolio_count=position.balance,
+                    offer=offers.get(position.ticker)
+                )
+            )
+
+        return RebalancePreview(
+            actions=self.actions,
+            free_cash=free_cash,
+            positions=positions
+        )
+
 
 if __name__ == "__main__":
     import pprint

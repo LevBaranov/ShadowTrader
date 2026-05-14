@@ -1,13 +1,13 @@
 import { BrowserRouter } from "react-router-dom";
-import { Container } from "@mui/material";
 import Router from "./router";
+import { AuthProvider } from "./AuthContext";
 
 export default function App() {
   return (
     <BrowserRouter>
-      <Container maxWidth="lg">
-        <Router />
-      </Container>
+      <AuthProvider>
+          <Router />
+      </AuthProvider>
     </BrowserRouter>
   );
 }

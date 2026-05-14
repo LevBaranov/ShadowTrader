@@ -255,19 +255,20 @@ if __name__ == "__main__":
     ### For sandbox method create account
     ####################################
     # from decimal import Decimal
-    # from tinkoff.invest import MoneyValue
-    # from tinkoff.invest.utils import decimal_to_quotation
+    # from t_tech.invest import MoneyValue
+    # from t_tech.invest.utils import decimal_to_quotation
     #
     # with br.get_client() as client:
-    #     account = client.sandbox.open_sandbox_account()
-    #     print(account)
-    #     money = decimal_to_quotation(Decimal(10000))
-    #     client.sandbox.sandbox_pay_in(
-    #         account_id=account.account_id,
-    #         amount=MoneyValue(units=money.units,
-    #                           nano=money.nano,
-    #                           currency='rub'),
-    #     )
+    #     # account = client.sandbox.open_sandbox_account()
+    #     for account in br.get_all_accounts():
+    #         print(account)
+    #         money = decimal_to_quotation(Decimal(10000))
+    #         client.sandbox.sandbox_pay_in(
+    #             account_id=account.id,
+    #             amount=MoneyValue(units=money.units,
+    #                               nano=money.nano,
+    #                               currency='rub'),
+    #         )
     #####################################
     accs = br.get_all_accounts()
     print(accs)

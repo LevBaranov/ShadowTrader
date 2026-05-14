@@ -1,29 +1,36 @@
 import { Routes, Route, Navigate } from "react-router-dom";
-import Rebalance from "../pages/Rebalance";
-import Bonds from "../pages/Bonds";
-import Login from "../pages/Login";
+import Rebalance from "../features/rebalance/pages/Rebalance";
+import Bonds from "../features/bonds/pages/Bonds";
+import Login from "../features/auth/pages/Login";
 import MainLayout from "./MainLayout";
-
-const isAuth = () => !!localStorage.getItem("token");
+import { useAuth } from "./AuthContext";
 
 
 export default function Router() {
+  const { isAuthenticated } = useAuth();
+
   return (
     <Routes>
-      {/* 🔒 приватные страницы */}
       <Route
-        element={isAuth() ? <MainLayout /> : <Navigate to="/login" />}
+        element={
+          isAuthenticated ? (
+            <MainLayout />
+          ) : (
+            <Navigate to="/login" />
+          )
+        }
       >
         <Route path="/" element={<Rebalance />} />
         <Route path="/bonds" element={<Bonds />} />
-
-        {/* fallback */}
         <Route path="*" element={<Navigate to="/" />} />
-
       </Route>
 
-      {/* 🔐 публичная */}
-      <Route path="/login" element={<Login />} />
+      <Route
+        path="/login"
+        element={
+          isAuthenticated ? <Navigate to="/" /> : <Login />
+        }
+      />
     </Routes>
   );
 }

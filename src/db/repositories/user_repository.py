@@ -14,6 +14,10 @@ class UserRepository:
         result = await self.db.scalar(stmt)
         return result
 
+    async def get_user_by_email(self, email: str) -> User | None:
+        stmt = select(User).where(User.email == email)
+        result = await self.db.scalar(stmt)
+        return result
 
     async def create_user(self, telegram_id: int) -> User:
 

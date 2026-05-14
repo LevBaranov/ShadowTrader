@@ -5,6 +5,7 @@ from src.config import settings
 
 from src.models.positions import Positions
 from src.models.index import Index
+from src.models.rebalance import CalculatedPosition
 
 
 class Balancer:
@@ -26,6 +27,8 @@ class Balancer:
         self.delta = delta
         self.commission = commission
         self.min_lots_to_keep = min_lots_to_keep
+
+        self.calculated_positions: list[CalculatedPosition] = []
 
     def __calculate_portfolio_value(self, portfolio_dataframe: pd.DataFrame) -> float:
         """Общая стоимость портфеля с учетом свободных средств"""
@@ -123,6 +126,27 @@ class Balancer:
         # Продаём что исключили из индекса
         total_value = self.__calculate_portfolio_value(portfolio_df)
         rebalanced = self.create_weights_dataframe(index_df, portfolio_df, total_value)
+
+        self.calculated_positions = []
+        for ticker, row in rebalanced.iterrows():
+
+            balance = 0
+            if ticker in portfolio_df.index:
+                balance = int(
+                    portfolio_df.at[ticker, 'balance']
+                )
+
+            self.calculated_positions.append(
+                CalculatedPosition(
+                    ticker=ticker,
+                    target_weight=float(row['target_weight']),
+                    current_weight=float(row['current_weight']),
+                    balance=balance,
+                    lot_size=int(row['lot_size']),
+                    last_price=float(row['last_price']),
+                )
+            )
+
         exclude_positions = rebalanced[rebalanced['target_weight'] == 0]
         for ticker, position in exclude_positions.iterrows():
             self.add_action(
