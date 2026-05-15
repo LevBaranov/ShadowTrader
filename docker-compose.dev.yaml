@@ -20,7 +20,9 @@ services:
     restart: unless-stopped
 
   migrations:
-    build: .
+    build:
+      context: .
+      dockerfile: backend.Dockerfile
     depends_on:
       db:
         condition: service_healthy
@@ -28,23 +30,59 @@ services:
       - ./dev.toml:/app/dev.toml
     env_file: .env-dev
     command: sh -c "alembic upgrade head"
+#
+#  app:
+#    build: .
+#    container_name: shadowtrader-app-dev
+#    depends_on:
+#      db:
+#        condition: service_healthy
+#      migrations:
+#        condition: service_completed_successfully
+#    volumes:
+#      - ./logs:/app/src/bot/logs
+#      - ./scheduler_results:/scheduler_results
+#      - ./dev.toml:/app/dev.toml
+#    env_file: .env-dev
+#    command: python src/main.py
+#    restart: unless-stopped
 
-  app:
-    build: .
-    container_name: shadowtrader-app-dev
+  api:
+    build:
+      context: .
+      dockerfile: backend.Dockerfile
+    container_name: shadowtrader-api-dev
     depends_on:
       db:
         condition: service_healthy
       migrations:
         condition: service_completed_successfully
     volumes:
-      - ./logs:/app/src/bot/logs
+      - ./logs/api:/app/src/api/logs
       - ./scheduler_results:/scheduler_results
       - ./dev.toml:/app/dev.toml
     env_file: .env-dev
-    command: python src/main.py
+    ports:
+      - 8000:8000
+    command: uvicorn src.api.main:app --host 0.0.0.0 --port 8000
     restart: unless-stopped
 
+  ui:
+    build:
+      context: .
+      dockerfile: frontend.Dockerfile
+      target: dev
+    container_name: shadowtrader-ui-dev
+    volumes:
+      - ./frontend:/app
+      - /app/node_modules
+    env_file: .env-dev
+    ports:
+      - "5173:5173"
+    environment:
+      - CHOKIDAR_USEPOLLING=true
+    depends_on:
+      - api
 volumes:
   pgdata:
     driver: local

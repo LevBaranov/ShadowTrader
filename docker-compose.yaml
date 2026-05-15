@@ -20,7 +20,7 @@ services:
     restart: unless-stopped
 
   migrations:
-    image: ghcr.io/levbaranov/shadowtrader:v0.4.0
+    image: ghcr.io/levbaranov/shadowtrader-back:${VERSION}
     depends_on:
       db:
         condition: service_healthy
@@ -29,9 +29,9 @@ services:
     env_file: .env
     command: alembic upgrade head
 
-  app:
-    image: ghcr.io/levbaranov/shadowtrader:v0.4.0
-    container_name: shadowtrader-app
+  bot:
+    image: ghcr.io/levbaranov/shadowtrader-back:${VERSION}
+    container_name: shadowtrader-bot
     depends_on:
       db:
         condition: service_healthy
@@ -44,7 +44,30 @@ services:
     env_file: .env
     command: python src/main.py
     restart: unless-stopped
-
+  api:
+    image: ghcr.io/levbaranov/shadowtrader-back:${VERSION}
+    container_name: shadowtrader-api
+    depends_on:
+      db:
+        condition: service_healthy
+      migrations:
+        condition: service_completed_successfully
+    volumes:
+      - ./prod.toml:/app/prod.toml
+      - ./scheduler_results:/scheduler_results
+      - ./logs:/app/src/api/logs
+    env_file: .env
+    command: uvicorn src.api.main:app --host 0.0.0.0 --port 8000
+    restart: unless-stopped
+  ui:
+    image: ghcr.io/levbaranov/shadowtrader-ui:${VERSION}
+    container_name: shadowtrader-ui
+    ports:
+      - "80:80"
+    environment:
+      - CHOKIDAR_USEPOLLING=true
+    depends_on:
+      - api
 volumes:
   pgdata_prod:
     driver: local

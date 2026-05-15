@@ -15,4 +15,4 @@ alembic==1.18.4
 asyncpg==0.31.0
 fastapi[standard]==0.136.1
 python-jose==3.5.0
-passlib[bcrypt]==1.7.4
+passlib[argon2]==1.7.4

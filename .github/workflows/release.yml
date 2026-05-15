@@ -25,11 +25,23 @@ jobs:
       - name: Extract release version
         run: echo "VERSION=${GITHUB_REF_NAME}" >> $GITHUB_ENV
 
-      - name: Build and push Docker image
+      - name: Build and push Docker backend image
         uses: docker/build-push-action@v6
         with:
           context: .
+          file: ./backend.Dockerfile
           push: true
           tags: |
-            ghcr.io/levbaranov/shadowtrader:${{ env.VERSION }}
-            ghcr.io/levbaranov/shadowtrader:latest
+            ghcr.io/levbaranov/shadowtrader-back:${{ env.VERSION }}
+            ghcr.io/levbaranov/shadowtrader-back:latest
+
+      - name: Build and push Docker frontend image
+        uses: docker/build-push-action@v6
+        with:
+          context: .
+          file: ./frontend.Dockerfile
+          target: prod
+          push: true
+          tags: |
+            ghcr.io/levbaranov/shadowtrader-ui:${{ env.VERSION }}
+            ghcr.io/levbaranov/shadowtrader-ui:latest

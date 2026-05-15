@@ -31,7 +31,7 @@ export default function StrategyCard({
   const [collapsed, setCollapsed] = useState(false);
   const [open, setOpen] = useState(false);
   const [loading, setLoading] = useState(false);
-  const [sortConfig, setSortConfig] =
+  const [sortConfig] =
     useState<SortConfig>({
         field: "portfolioWeight",
         direction: "desc",

@@ -3,9 +3,8 @@ import axios from "axios";
 import { triggerLogout } from "../../app/logoutBus";
 
 const api = axios.create({
-  baseURL: import.meta.env.VITE_API_URL,
+  baseURL: "/api",
 });
-console.log(import.meta.env.VITE_API_URL);
 
 api.interceptors.request.use((config) => {
   const token = localStorage.getItem("token");
