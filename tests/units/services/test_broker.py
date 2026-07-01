@@ -164,7 +164,7 @@ class TestTAccount:
     def test_create_order_buy(self):
         from src.services.broker import TAccount
         from src.models.action import Action
-        from t_tech.invest import OrderDirection
+        from t_tech.invest.grpc import OrderDirection
 
         broker = MagicMock()
         client = MagicMock()
