@@ -3,7 +3,9 @@ from typing import List, Dict, Optional
 from contextlib import contextmanager
 from dataclasses import asdict
 
-from t_tech.invest import Client, OrderDirection, OrderType, RequestError
+from t_tech.invest import RequestError
+from t_tech.invest.grpc import Client, OrderDirection, OrderType
+from t_tech.invest.grpc import PositionsRequest, GetLastPricesRequest, PostOrderRequest
 from t_tech.invest.constants import INVEST_GRPC_API_SANDBOX
 
 from src.config import settings
@@ -177,7 +179,8 @@ class TAccount:
 
 
         with self.broker.get_client() as client:
-            positions = client.operations.get_positions(account_id=self.account_id)
+            request = PositionsRequest(account_id=self.account_id)
+            positions = client.operations.get_positions(request)
 
             if not positions.securities:
                 return Positions(cash=PositionsCash(**asdict(positions.money[0])) if positions.money else None,
@@ -199,7 +202,8 @@ class TAccount:
             last_prices = {
                 last_price.instrument_uid: last_price.price
                 for last_price in client.market_data.get_last_prices(
-                    instrument_id=[p.instrument_uid for p in positions.securities]).last_prices
+                    GetLastPricesRequest(instrument_id=[p.instrument_uid for p in positions.securities])
+                ).last_prices
             }
 
             shares_positions = []
@@ -230,7 +234,7 @@ class TAccount:
         order_id = str(uuid.uuid4())
         with self.broker.get_client() as client:
             try:
-                return client.orders.post_order(
+                request = PostOrderRequest(
                     instrument_id=action.share.uid,
                     quantity=action.quantity,
                     # price=price,
@@ -239,6 +243,8 @@ class TAccount:
                     order_type=OrderType.ORDER_TYPE_BESTPRICE,  # TODO: Добавить другие типы
                     order_id=order_id
                 )
+                return client.orders.post_order(request)
+
             except RequestError as e:
                 raise Error(source="Broker", source_data=e, data=action, description=e.metadata.message)
 
