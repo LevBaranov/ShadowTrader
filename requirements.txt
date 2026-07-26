@@ -16,3 +16,4 @@ asyncpg==0.31.0
 fastapi[standard]==0.136.1
 python-jose==3.5.0
 passlib[argon2]==1.7.4
+cryptography==44.0.0

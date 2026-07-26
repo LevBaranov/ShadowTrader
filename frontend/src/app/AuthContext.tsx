@@ -1,5 +1,6 @@
 import { createContext, useContext, useEffect, useState } from "react";
 import { setLogoutHandler } from "./logoutBus";
+import { clearCurrentUserCache } from "../features/rebalance/api/client";
 
 type AuthContextType = {
   token: string | null;
@@ -30,6 +31,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 
   const logout = () => {
     localStorage.removeItem("token");
+    clearCurrentUserCache();
     setToken(null);
   };
 

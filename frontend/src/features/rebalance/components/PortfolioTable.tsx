@@ -13,7 +13,7 @@ const columns: GridColDef[] = [
     { field: 'portfolioCount', headerName: 'Колво в портфеле', width: 150 },
     {
       field: 'offer',
-      headerName: 'Предложение по покупке',
+      headerName: 'Предложение (покупка/продажа)',
       width: 200,
       renderCell: (params: GridRenderCellParams) => {
         const value = params.value;

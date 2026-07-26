@@ -6,8 +6,10 @@ export function useCurrentUser() {
   const [loading, setLoading] = useState(true);
   const [user, setUser] = useState<CurrentUserInfo | null>(null);
 
-  const refresh = async () => {
-    const me = await getCurrentUser();
+  // force: после мутаций (создание/удаление стратегии, балансировка)
+  // нужно получить свежие данные, а не закэшированный промис.
+  const refresh = async (force = true) => {
+    const me = await getCurrentUser(force);
 
     setUser(me);
   };
@@ -17,7 +19,7 @@ export function useCurrentUser() {
       try {
         setLoading(true);
 
-        await refresh();
+        await refresh(false);
 
       } catch (e) {
       console.error(e);

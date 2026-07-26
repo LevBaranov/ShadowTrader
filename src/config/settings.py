@@ -21,3 +21,8 @@ class APISettings(BaseSettings):
     JWT_ISSUER: str = os.getenv("JWT_ISSUER")
     JWT_AUDIENCE: str = os.getenv("JWT_AUDIENCE")
 
+    # Ключ (Fernet, url-safe base64, 32 байта) для шифрования брокерских токенов в БД.
+    # Держим отдельно от SECRET_KEY, чтобы ротация JWT-секрета не ломала расшифровку токенов.
+    # Сгенерировать: python -c "from cryptography.fernet import Fernet; print(Fernet.generate_key().decode())"
+    TOKEN_ENCRYPTION_KEY: str = os.getenv("TOKEN_ENCRYPTION_KEY")
+

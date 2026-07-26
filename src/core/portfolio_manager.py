@@ -21,13 +21,24 @@ class PortfolioManager:
     рассчитывает что нужно сделать для балансировки
     """
 
-    def __init__(self, account_id: str = None):
+    def __init__(self, broker_token: str, account_id: str = None, sandbox: bool = None):
+        """
+        :param broker_token: Токен доступа к брокеру. Резолвится на сервисном слое из БД,
+            ядро не знает, откуда он взялся.
+        :param account_id: Идентификатор аккаунта пользователя в формате uuid.
+        :param sandbox: Режим песочницы. Если None — используется значение по умолчанию из TBroker.
+        """
         self.actions: List[Action] = []
-        self.broker = TBroker()
+
+        broker_kwargs = {"token": broker_token}
+        if sandbox is not None:
+            broker_kwargs["sandbox"] = sandbox
+        self.broker = TBroker(**broker_kwargs)
+
+        self.account_client: Optional[TAccount] = None
         if account_id:
             self.set_account(account_id)
-        else:
-            self.account_client: Optional[TAccount] = None
+
         self._index_cache: Dict[Tuple[str, datetime.date], Index] = {}
         self._indices_cache: Dict[datetime.date, List[Tuple[str, str]]] = {}
         self.moex = Moex()
@@ -190,7 +201,9 @@ class PortfolioManager:
             share = self.broker.find_share(action.get("ticker"), "ticker")
             self.actions.append(Action(type=action.get("type"), quantity=action.get("quantity"), share=share))
 
-            offers[share.ticker] = action.get("quantity")
+            # Знак определяет направление сделки: покупка > 0, продажа < 0.
+            quantity = action.get("quantity")
+            offers[share.ticker] = -quantity if action.get("type") == "SELL" else quantity
 
 
         positions = []
@@ -229,6 +242,7 @@ class PortfolioManager:
 
         return RebalancePreview(
             actions=self.actions,
+            current_free_cash=portfolio.cash.to_float() if portfolio.cash else 0.0,
             free_cash=free_cash,
             positions=positions
         )

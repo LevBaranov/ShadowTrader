@@ -10,7 +10,7 @@ import {
 import { buttonStyles } from "../../../shared/theme/buttons";
 
 import StrategyDialog from "../components/StrategyDialog";
-import type { 
+import type {
   UserStrategy
 } from "../types/user";
 import { useCurrentUser } from "../hooks/useCurrentUser";
@@ -20,7 +20,19 @@ import StrategyCard from "../components/StrategyCard";
 export default function Rebalance() {
   const { user, loading, refresh, } = useCurrentUser();
   const [strategyDialog, setStrategyDialog] = useState(false);
-  
+
+  const dialog = (
+    <StrategyDialog
+      open={strategyDialog}
+      onClose={() =>
+        setStrategyDialog(false)
+      }
+      onSave={async () => {
+        await refresh();
+      }}
+    />
+  );
+
   if (loading) {
     return (
       <Box
@@ -60,44 +72,52 @@ export default function Rebalance() {
           Добавить стратегию
         </Button>
 
-        <StrategyDialog
-          open={strategyDialog}
-          onClose={() =>
-            setStrategyDialog(false)
-          }
-          onSave={async () => {
-            setStrategyDialog(false);
-
-            await refresh();
-          }}
-        />
+        {dialog}
       </Box>
     );
   }
 
   return (
     <Box>
-      <Typography
-        variant="h5"
+      <Box
         sx={{
+          display: "flex",
+          justifyContent: "space-between",
+          alignItems: "center",
           mb: 3,
-          fontWeight: "bold",
         }}
       >
-        Портфели
-      </Typography>
+        <Typography
+          variant="h5"
+          sx={{ fontWeight: "bold" }}
+        >
+          Портфели
+        </Typography>
+
+        <Button
+          variant="contained"
+          sx={buttonStyles}
+          onClick={() =>
+            setStrategyDialog(true)
+          }
+        >
+          Добавить стратегию
+        </Button>
+      </Box>
 
       {user.strategies.map(
         (
           strategy: UserStrategy
         ) => (
           <StrategyCard
-            key={strategy.brokerInfo.id}
+            key={strategy.id}
             strategy={strategy}
             onUpdated={refresh}
           />
         )
       )}
+
+      {dialog}
     </Box>
   );
 }

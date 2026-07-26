@@ -1,7 +1,7 @@
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 
-from src.api.routes import health, auth, user, portfolio
+from src.api.routes import health, auth, user, portfolio, broker, strategy, index
 
 
 def create_app() -> FastAPI:
@@ -20,5 +20,8 @@ def create_app() -> FastAPI:
     app.include_router(auth.router)
     app.include_router(user.router)
     app.include_router(portfolio.router)
+    app.include_router(broker.router)
+    app.include_router(strategy.router)
+    app.include_router(index.router)
 
     return app

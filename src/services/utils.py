@@ -81,7 +81,8 @@ INTEGRATION_LOG_ENABLED = settings.logging.enabled
 integration_logger = logging.getLogger("broker_integration")
 integration_logger.setLevel(logging.DEBUG if INTEGRATION_LOG_ENABLED else logging.CRITICAL)
 
-if not integration_logger.handlers:
+# Файл лога не создаём, когда логирование выключено (например, в тестах).
+if INTEGRATION_LOG_ENABLED and not integration_logger.handlers:
     os.makedirs(os.path.dirname(INTEGRATION_LOG_PATH), exist_ok=True)
     handler = logging.FileHandler(INTEGRATION_LOG_PATH, encoding="utf-8")
     formatter = logging.Formatter('%(asctime)s | %(name)s | %(levelname)s | %(message)s')

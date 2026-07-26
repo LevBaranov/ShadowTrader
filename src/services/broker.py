@@ -4,14 +4,14 @@ from contextlib import contextmanager
 from dataclasses import asdict
 
 from t_tech.invest import RequestError
+from t_tech.invest.exceptions import UnauthenticatedError
 from t_tech.invest.grpc import Client, OrderDirection, OrderType
 from t_tech.invest.grpc import PositionsRequest, GetLastPricesRequest, PostOrderRequest
 from t_tech.invest.constants import INVEST_GRPC_API_SANDBOX
 
-from src.config import settings
 from src.models.instrument import InstrumentBase
 
-from src.services.utils import cache_data, log_response
+# from src.services.utils import cache_data, log_response
 
 from src.models.account import Account
 from src.models.positions import Positions, PositionsCash, Cash, PositionsInstrument
@@ -20,12 +20,16 @@ from src.models.action import Action
 from src.models.error import Error
 
 
+class BrokerAuthError(Exception):
+    """Токен брокера отсутствует или недействителен."""
+
+
 class TBroker:
     """
     Класс брокера Т-Банка. Будем получать информацию об аккаунтах
     """
 
-    def __init__(self, token: str = settings.broker.token, sandbox: bool = settings.broker.sandbox_mode):
+    def __init__(self, token: str, sandbox: bool):
         self.token = token
         self.target = INVEST_GRPC_API_SANDBOX if sandbox else None
         self._shares_by_uid: Dict[str, Share] = {}
@@ -48,12 +52,15 @@ class TBroker:
             Возвращает список всех аккаунтов доступных в брокере
         :return: List[Account]
         """
-        with self.get_client() as client:
-            accounts = client.users.get_accounts().accounts
+        try:
+            with self.get_client() as client:
+                accounts = client.users.get_accounts().accounts
+        except UnauthenticatedError as exc:
+            raise BrokerAuthError("Broker token is invalid") from exc
 
         return [Account(id=a.id, name=a.name) for a in accounts]
 
-    @log_response()
+    # @log_response()
     # @cache_data(ttl_seconds=86400)
     def get_all_shares(self) -> ShareList:
         """
@@ -74,7 +81,7 @@ class TBroker:
         return ShareList(shares)
 
 
-    @log_response()
+    # @log_response()
     def find_share(self, value: str, field: str = "uid") -> Optional[Share]:
         """
         Метод для поиска информации об акции. Может принимать на вход uid или ticker
@@ -98,7 +105,7 @@ class TBroker:
 
         return result
 
-    @log_response()
+    # @log_response()
     def find_instrument(self, value: str, field: str = "uid") -> Optional[InstrumentBase]:
         """
         Метод для поиска информации об облигациях. Может принимать на вход uid или ticker
@@ -122,7 +129,7 @@ class TBroker:
 
         return result
 
-    @log_response()
+    # @log_response()
     def get_all_instruments(self) -> list[InstrumentBase]:
         """
         Возвращает список всех инструментов с их дополнительной информацией.
@@ -254,7 +261,7 @@ if __name__ == "__main__":
     import pprint
 
 
-    br = TBroker()
+    br = TBroker("t.KXjyJ5qT5DYhUJi76tt7zXKSanYo5PDAset4VfAMOfXpJfbZvvqUg5GVqMjDG_611P_U3RXBIQXghPiOS1L_Dw", True)
     # print(br.find_share("SBER", "ticker"))
     # pprint.pprint(br.get_all_shares())
     ####################################
@@ -268,13 +275,13 @@ if __name__ == "__main__":
     #     # account = client.sandbox.open_sandbox_account()
     #     for account in br.get_all_accounts():
     #         print(account)
-    #         money = decimal_to_quotation(Decimal(10000))
-    #         client.sandbox.sandbox_pay_in(
-    #             account_id=account.id,
-    #             amount=MoneyValue(units=money.units,
-    #                               nano=money.nano,
-    #                               currency='rub'),
-    #         )
+    #         # money = decimal_to_quotation(Decimal(10000))
+    #         # client.sandbox.sandbox_pay_in(
+    #         #     account_id=account.id,
+    #         #     amount=MoneyValue(units=money.units,
+    #         #                       nano=money.nano,
+    #         #                       currency='rub'),
+    #         # )
     #####################################
     accs = br.get_all_accounts()
     print(accs)
@@ -284,18 +291,20 @@ if __name__ == "__main__":
     ####################################
     # instr = br.find_instrument("RU000A105SK4", "ticker")
     # print(f"{instr=}")
-    # with br.get_client() as client:
-    #     try:
-    #         client.orders.post_order(
-    #             instrument_id="e022255e-fd8a-420a-bb13-ff7ddd10157c",       #e022255e-fd8a-420a-bb13-ff7ddd10157c
-    #             quantity=1,
-    #             # price=price,
-    #             direction=OrderDirection.ORDER_DIRECTION_BUY,
-    #             account_id=ac.account_id,
-    #             order_type=OrderType.ORDER_TYPE_BESTPRICE,  # TODO: Добавить другие типы
-    #             # order_id=order_id
-    #         )
-    #     except RequestError as e:
-    #         print(f"Order failed: {e}")
+    with br.get_client() as client:
+        try:
+            request = PostOrderRequest(
+                instrument_id="9b9a584e-448f-40da-9ba8-353b44ad697a",  # e022255e-fd8a-420a-bb13-ff7ddd10157c
+                quantity=10,
+                # price=price,
+                direction=OrderDirection.ORDER_DIRECTION_BUY,
+                account_id=ac.account_id,
+                order_type=OrderType.ORDER_TYPE_BESTPRICE,  # TODO: Добавить другие типы
+                # order_id=order_id
+            )
+            client.orders.post_order(request)
+
+        except RequestError as e:
+            print(f"Order failed: {e}")
     pos = ac.get_positions()
     print(pos)

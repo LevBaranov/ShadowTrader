@@ -22,6 +22,8 @@ export type PortfolioStrategy = {
 };
 
 export type UserStrategy = {
+  id: string;
+
   brokerInfo: BrokerInfoStrategy;
 
   indexInfo: BaseInfo;
@@ -29,6 +31,9 @@ export type UserStrategy = {
   portfolio: PortfolioStrategy[];
 
   freeCash: number;
+  freeCashAfter: number;
+
+  accountDeleted: boolean;
 };
 
 export type CurrentUserInfo = {

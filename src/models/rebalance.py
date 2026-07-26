@@ -3,7 +3,6 @@ from typing import List
 
 from src.models.action import Action
 from src.models.api_base import BaseApiModel
-from src.models.error import Error
 
 
 class PortfolioPosition(BaseApiModel):
@@ -16,13 +15,35 @@ class PortfolioPosition(BaseApiModel):
     offer: int | None = None
 
 
+class RebalanceActionResult(BaseApiModel):
+    """Успешно исполненное действие балансировки в API-ответе."""
+    type: str
+    ticker: str | None = None
+    quantity: int
+
+
+class RebalanceErrorResult(BaseApiModel):
+    """Ошибка исполнения действия в API-ответе.
+
+    Доменный Error таскает в себе сырые объекты SDK (RequestError и т.п.),
+    которые pydantic не сериализует — наружу отдаём только плоские поля.
+    """
+    type: str | None = None
+    ticker: str | None = None
+    quantity: int | None = None
+    description: str | None = None
+
+
 class RebalanceResult(BaseApiModel):
-    success: List[Action]
-    errors:  List[Error]
+    success: List[RebalanceActionResult]
+    errors:  List[RebalanceErrorResult]
 
 
 class RebalancePreview(BaseModel):
     actions: List[Action]
+    # Свободные средства на счёте сейчас.
+    current_free_cash: float
+    # Сколько останется после применения рассчитанных действий.
     free_cash: float
 
     positions: List[PortfolioPosition]

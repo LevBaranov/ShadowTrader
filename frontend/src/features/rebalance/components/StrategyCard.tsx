@@ -1,17 +1,19 @@
 import { useMemo, useState } from "react";
-import { Box, Button, Card, CardContent, Grid, IconButton, Typography } from "@mui/material";
+import { Alert, Box, Button, Card, CardContent, Grid, IconButton, Typography } from "@mui/material";
 import ExpandMoreIcon from "@mui/icons-material/ExpandMore";
+import DeleteOutlineIcon from "@mui/icons-material/DeleteOutlined";
 
 import { mapPortfolioToAssets } from "../mappers/portfolio.mapper";
 
 import type { UserStrategy } from "../types/user";
 import type { SortConfig } from "../types/sort";
 import type { Action, Asset } from "../types/rebalance";
+import type { RebalanceExecutionResult } from "../types/strategy";
 
 import { buildRebalanceActions } from "../utils/buildActions";
 import { sortAssets } from "../utils/sortAssets";
 
-import { executeRebalance } from "../api/client";
+import { executeRebalance, deleteStrategy } from "../api/client";
 import { buttonStyles } from "../../../shared/theme/buttons";
 
 import PortfolioTable from "./PortfolioTable";
@@ -30,7 +32,7 @@ export default function StrategyCard({
 }) {
   const [collapsed, setCollapsed] = useState(false);
   const [open, setOpen] = useState(false);
-  const [loading, setLoading] = useState(false);
+  const [deleting, setDeleting] = useState(false);
   const [sortConfig] =
     useState<SortConfig>({
         field: "portfolioWeight",
@@ -52,16 +54,30 @@ export default function StrategyCard({
   ]);
   const actions: Action[] = buildRebalanceActions(assets);
 
-  const handleExecute = async () => {
-    try {
-      setLoading(true);
+  const handleExecute = async (): Promise<RebalanceExecutionResult> => {
+    const result = await executeRebalance(strategy.id);
 
-      await executeRebalance(actions);
+    await onUpdated();
+
+    return result;
+  };
+
+  const handleDelete = async () => {
+    if (
+      !window.confirm(
+        `Удалить стратегию «${strategy.indexInfo.name}» по счёту «${strategy.brokerInfo.account.name}»?`
+      )
+    ) {
+      return;
+    }
+
+    try {
+      setDeleting(true);
+
+      await deleteStrategy(strategy.id);
       await onUpdated();
-      
-      setOpen(false);
     } finally {
-      setLoading(false);
+      setDeleting(false);
     }
   };
 
@@ -93,13 +109,18 @@ export default function StrategyCard({
             <Typography color="text.secondary">
               Счёт:{" "}
               {
-                strategy.brokerInfo.account.name
+                strategy.brokerInfo.account.name || "Без названия"
               }
             </Typography>
 
             <Typography color="text.secondary">
               Свободные средства:{" "}
               {strategy.freeCash.toLocaleString()} ₽
+            </Typography>
+
+            <Typography color="text.secondary">
+              После балансировки:{" "}
+              {strategy.freeCashAfter.toLocaleString()} ₽
             </Typography>
           </Box>
 
@@ -113,14 +134,22 @@ export default function StrategyCard({
             <Button
               sx={buttonStyles}
               disabled={
-                actions.length === 0 || loading
+                strategy.accountDeleted ||
+                actions.length === 0 ||
+                deleting
               }
               onClick={() => setOpen(true)}
             >
-              {loading
-                ? "Выполнение..."
-                : "Балансировка"}
+              Балансировка
             </Button>
+
+            <IconButton
+              onClick={handleDelete}
+              disabled={deleting}
+              title="Удалить стратегию"
+            >
+              <DeleteOutlineIcon />
+            </IconButton>
 
             <IconButton
               onClick={() =>
@@ -139,6 +168,13 @@ export default function StrategyCard({
             </IconButton>
           </Box>
         </Box>
+
+        {strategy.accountDeleted && (
+          <Alert severity="warning" sx={{ mb: 2 }}>
+            Счёт помечен удалённым у брокера — балансировка недоступна.
+            Обновите список счетов или удалите стратегию.
+          </Alert>
+        )}
 
         {/* CONTENT */}
         {!collapsed && (
@@ -185,4 +221,3 @@ export default function StrategyCard({
     </Card>
   );
 }
-

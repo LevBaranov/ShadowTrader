@@ -9,28 +9,46 @@ import {
 import { useState } from "react";
 import { buttonStyles } from "../../../shared/theme/buttons";
 import type { Action } from "../types/rebalance";
+import type { RebalanceExecutionResult } from "../types/strategy";
 
 
 type Props = {
   open: boolean;
   onClose: () => void;
   actions: Action[];
-  onExecute: () => Promise<void>;
+  onExecute: () => Promise<RebalanceExecutionResult>;
 };
 
-export default function RebalanceDialog({ 
+export default function RebalanceDialog({
   open,
   onClose,
-  actions, 
+  actions,
   onExecute
 }: Props) {
   const [loading, setLoading] = useState(false);
-  const [result, setResult] = useState<any | null>(null);
+  const [result, setResult] = useState<RebalanceExecutionResult | null>(null);
 
   const handleClose = () => {
     setLoading(false);
     setResult(null);
     onClose();
+  };
+
+  const handleExecute = async () => {
+    try {
+      setLoading(true);
+
+      setResult(await onExecute());
+    } catch (e) {
+      console.error(e);
+
+      setResult({
+        success: [],
+        errors: ["Не удалось выполнить балансировку"],
+      });
+    } finally {
+      setLoading(false);
+    }
   };
 
 
@@ -45,8 +63,11 @@ export default function RebalanceDialog({
 
             <ul>
               {actions.map((a, i) => (
-                <li key={i}>
-                  {a.type === "BUY" ? "Купить" : "Продать"} {a.ticker} в количестве {a.quantity} шт.
+                <li
+                  key={i}
+                  style={{ color: a.type === "SELL" ? "red" : "green" }}
+                >
+                  {a.type === "SELL" ? "Продать" : "Купить"} {a.ticker} в количестве {a.quantity} шт.
                 </li>
               ))}
             </ul>
@@ -63,11 +84,15 @@ export default function RebalanceDialog({
         {result && (
           <div>
             <b>Успешно:</b>
-            <ul>
-              {result.success.map((a: string, i: number) => (
-                <li key={i}>{a}</li>
-              ))}
-            </ul>
+            {result.success.length === 0 ? (
+              <div>Нет</div>
+            ) : (
+              <ul>
+                {result.success.map((a: string, i: number) => (
+                  <li key={i}>{a}</li>
+                ))}
+              </ul>
+            )}
 
             <b>Ошибки:</b>
             {result.errors.length === 0 ? (
@@ -75,7 +100,7 @@ export default function RebalanceDialog({
             ) : (
               <ul>
                 {result.errors.map((e: string, i: number) => (
-                  <li key={i}>{e}</li>
+                  <li key={i} style={{ color: "red" }}>{e}</li>
                 ))}
               </ul>
             )}
@@ -88,7 +113,7 @@ export default function RebalanceDialog({
           <>
             <Button onClick={handleClose}>Нет</Button>
 
-            <Button sx={buttonStyles} onClick={onExecute}>
+            <Button sx={buttonStyles} onClick={handleExecute}>
               Да
             </Button>
           </>

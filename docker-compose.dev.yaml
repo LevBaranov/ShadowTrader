@@ -8,7 +8,7 @@ services:
       POSTGRES_DB: postgres_db
       PGDATA: /var/lib/postgresql/data/pgdata
     ports:
-      - 54321:5432
+      - 5432:5432
     volumes:
       - pgdata:/var/lib/postgresql/data/pgdata
     healthcheck:
@@ -29,7 +29,7 @@ services:
     volumes:
       - ./dev.toml:/app/dev.toml
     env_file: .env-dev
-    command: sh -c "alembic upgrade head"
+    command: alembic upgrade head
 #
 #  app:
 #    build: .
@@ -58,9 +58,10 @@ services:
       migrations:
         condition: service_completed_successfully
     volumes:
+      - ./src:/app/src
       - ./logs/api:/app/src/api/logs
       - ./scheduler_results:/scheduler_results
-      - ./dev.toml:/app/dev.toml
+      - ./prod.toml:/app/dev.toml
     env_file: .env-dev
     ports:
       - 8000:8000

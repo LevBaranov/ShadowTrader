@@ -4,11 +4,14 @@ from unittest.mock import MagicMock, patch
 import os
 import json
 
+TEST_DATA_DIR = os.path.join(os.path.dirname(__file__), "test_data")
+
+
 class TestTBroker:
 
     @staticmethod
     def load_test_data(filename):
-        with open(os.path.join("test_data", filename), "r") as f:
+        with open(os.path.join(TEST_DATA_DIR, filename), "r") as f:
             return json.load(f)
 
     # @pytest.fixture(autouse=True)
@@ -24,17 +27,24 @@ class TestTBroker:
     #     # Подменяем ДО любого импорта TBroker
     #     monkeypatch.setattr("src.services.utils.cache_data", no_cache_decorator)
 
-    def test_init_with_default_settings(self):
-        from src.config import settings
+    def test_init_sandbox(self):
         from t_tech.invest.constants import INVEST_GRPC_API_SANDBOX
         from src.services.broker import TBroker
 
-        broker = TBroker()
+        broker = TBroker(token="test-token", sandbox=True)
 
-        assert broker.token == settings.broker.token
-        assert broker.target == (INVEST_GRPC_API_SANDBOX if settings.broker.sandbox_mode else None)
+        assert broker.token == "test-token"
+        assert broker.target == INVEST_GRPC_API_SANDBOX
         assert broker._shares_by_uid == {}
         assert broker._shares_by_ticker == {}
+
+    def test_init_production(self):
+        from src.services.broker import TBroker
+
+        broker = TBroker(token="test-token", sandbox=False)
+
+        assert broker.token == "test-token"
+        assert broker.target is None
 
     def test_get_all_accounts(self):
         from src.models.account import Account
@@ -104,8 +114,8 @@ class TestTAccount:
         client = MagicMock()
 
         # Мокаем данные
-        position_security = MagicMock(instrument_uid="uid123", balance=5)
-        share = Share(uid="uid123", figi="figi123", ticker="TST", lot_size=10, isin="ISIN123")
+        position_security = MagicMock(instrument_uid="uid123", balance=5, instrument_type="share")
+        share = Share(uid="uid123", figi="figi123", ticker="TST", lot_size=10, isin="ISIN123", type="share")
 
         last_price = MagicMock(instrument_uid="uid123", price=Cash(units=100, nano=0))
         money = [PositionsCash(currency="rub", units=1000, nano=0)]
@@ -115,7 +125,7 @@ class TestTAccount:
         client.market_data.get_last_prices.return_value.last_prices = [last_price]
 
         broker.get_client.return_value.__enter__.return_value = client
-        broker.find_share.return_value = share
+        broker.find_instrument.return_value = share
 
         account = TAccount(account_id="acc_1", broker=broker)
         positions = account.get_positions()
@@ -175,12 +185,14 @@ class TestTAccount:
         account = TAccount(account_id="acc_4", broker=broker)
         response = account.create_order(action)
 
+        # create_order передаёт один объект PostOrderRequest
         client.orders.post_order.assert_called_once()
         args, kwargs = client.orders.post_order.call_args
-        assert kwargs["direction"] == OrderDirection.ORDER_DIRECTION_BUY
-        assert kwargs["instrument_id"] == "uid123"
-        assert kwargs["quantity"] == 10
-        assert kwargs["account_id"] == "acc_4"
+        request = args[0] if args else kwargs["request"]
+        assert request.direction == OrderDirection.ORDER_DIRECTION_BUY
+        assert request.instrument_id == "uid123"
+        assert request.quantity == 10
+        assert request.account_id == "acc_4"
 
     def test_create_order_error(self):
         from src.services.broker import TAccount

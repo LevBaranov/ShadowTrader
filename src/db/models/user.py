@@ -15,3 +15,15 @@ class User(Base):
         back_populates="user",
         cascade="all, delete-orphan"
     )
+
+    users_broker: Mapped[list["UsersBroker"]] = relationship(
+        "UsersBroker",
+        back_populates="user",
+        cascade="all, delete-orphan"
+    )
+
+    users_strategy: Mapped["UsersStrategy"] = relationship(
+        "UsersStrategy",
+        back_populates="user",
+        cascade="all, delete-orphan"
+    )
