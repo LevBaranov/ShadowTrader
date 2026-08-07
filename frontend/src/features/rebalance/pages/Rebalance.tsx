@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useCallback, useEffect, useState } from "react";
 import {
   Box,
   Typography,
@@ -8,6 +8,8 @@ import {
 
 
 import { buttonStyles } from "../../../shared/theme/buttons";
+import { findTask, getTasks } from "../../../shared/api/tasks";
+import type { Task } from "../../../shared/types/task";
 
 import StrategyDialog from "../components/StrategyDialog";
 import type {
@@ -20,6 +22,24 @@ import StrategyCard from "../components/StrategyCard";
 export default function Rebalance() {
   const { user, loading, refresh, } = useCurrentUser();
   const [strategyDialog, setStrategyDialog] = useState(false);
+  // Задачи планировщика: по ним видно, включена ли автобалансировка стратегии.
+  const [tasks, setTasks] = useState<Task[]>([]);
+
+  const loadTasks = useCallback(async () => {
+    try {
+      setTasks(await getTasks());
+    } catch (e) {
+      console.error(e);
+    }
+  }, []);
+
+  useEffect(() => {
+    const load = async () => {
+      await loadTasks();
+    };
+
+    load();
+  }, [loadTasks]);
 
   const dialog = (
     <StrategyDialog
@@ -112,7 +132,11 @@ export default function Rebalance() {
           <StrategyCard
             key={strategy.id}
             strategy={strategy}
+            scheduleTask={findTask(tasks, "REBALANCE", {
+              strategy_id: strategy.id,
+            })}
             onUpdated={refresh}
+            onScheduleChanged={loadTasks}
           />
         )
       )}

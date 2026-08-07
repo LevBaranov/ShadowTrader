@@ -1,7 +1,18 @@
 .git
 __pycache__/
 *.toml
+# Секреты и локальные результаты — в образ попадать не должны.
+.env
+.env-dev
+.env-example
 .venv/
 venv/
 .idea/
 *.log
+# Бот собирается своим образом (bot.Dockerfile) — в образ бэкенда не попадает.
+bot/
+frontend/node_modules/
+frontend/dist/
+tests/
+.pytest_cache/
+logs/

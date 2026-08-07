@@ -1,10 +1,15 @@
 import requests
 
-from src.config import settings
+from src.config import stock_market_settings
+from src.logging_setup import integration_call
 
 from src.models.index import Index, IndexItem
 from src.models.bond import MoexBond
 from src.models.error import Error
+
+
+# Имя интеграции в логах: пишется в logs/moex.log.
+SERVICE = "moex"
 
 
 class Moex:
@@ -12,22 +17,33 @@ class Moex:
     Класс для работы с Московской биржей
     """
 
-    def __init__(self, limit:int = settings.stock_market.limit, base_url:str = settings.stock_market.base_url):
+    def __init__(
+        self,
+        limit: int = stock_market_settings.MOEX_INDEX_LIMIT,
+        base_url: str = stock_market_settings.MOEX_BASE_URL,
+    ):
 
         self.limit = limit
         self.base_url = base_url
         self.session = requests.Session()
 
-    def _fetch_json(self, url: str, params: dict) -> dict:
-        try:
-            response = self.session.get(url, params=params)
-            response.raise_for_status()
-            return response.json()
-        except requests.RequestException as e:
-            raise Error(source="Moex",
-                        source_data=e,
-                        data={"url": url, "params": params},
-                        description=f"Code: {e.response.status_code}")
+    def _fetch_json(self, url: str, params: dict, operation: str = "request") -> dict:
+        """Единственная точка выхода на Мосбиржу — здесь же и логируем вызов."""
+        with integration_call(SERVICE, operation, url=url) as call:
+            try:
+                response = self.session.get(url, params=params)
+                response.raise_for_status()
+            except requests.RequestException as e:
+                raise Error(source="Moex",
+                            source_data=e,
+                            data={"url": url, "params": params},
+                            description=f"Code: {e.response.status_code}")
+
+            data = response.json()
+            call.add(status=response.status_code)
+            call.detail(params=params, response=data)
+
+            return data
 
     def _load_index_data(self, index_name: str) -> list:
         url = f"{self.base_url}/statistics/engines/stock/markets/index/analytics/{index_name}.json"
@@ -36,7 +52,7 @@ class Moex:
             "start": 0,
             "analytics.columns": "indexid,tradedate,ticker,shortnames,weight",
         }
-        data = self._fetch_json(url, params)
+        data = self._fetch_json(url, params, operation="index_analytics")
         return data.get("analytics", {}).get("data", [])
 
     def _load_market_data(self, index_name: str) -> tuple[list, list]:
@@ -47,7 +63,7 @@ class Moex:
             "marketdata.columns": "SECID,LAST",
             "securities.columns": "SECID,LOTSIZE,ISIN"
         }
-        data = self._fetch_json(url, params)
+        data = self._fetch_json(url, params, operation="index_market_data")
         market = data.get("marketdata", {}).get("data", [])
         sec = data.get("securities", {}).get("data", [])
         return sec, market
@@ -104,7 +120,7 @@ class Moex:
             "start": 0,
             "securities.columns": "SECID, SHORTNAME, IS_TRADED"
         }
-        data = self._fetch_json(url, params)
+        data = self._fetch_json(url, params, operation="get_indices")
         result = []
         for indexid, shortname, is_traded in data.get("securities", {}).get("data", []):
 
@@ -126,16 +142,7 @@ class Moex:
             "securities.columns":
                 "SECID,SHORTNAME,BOARDNAME,LOTVALUE,OFFERDATE,CALLOPTIONDATE,PUTOPTIONDATE,BUYBACKPRICE",
         }
-        data = self._fetch_json(url, params)
+        data = self._fetch_json(url, params, operation="get_bonds")
         result = [ MoexBond(*sec) for sec in data.get("securities", {}).get("data", [])]
 
         return result
-
-
-
-
-if __name__ == "__main__":
-    m = Moex()
-    bonds = m.get_bonds()
-    print(bonds)
-    print(len(bonds))

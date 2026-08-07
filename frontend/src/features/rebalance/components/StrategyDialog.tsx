@@ -13,22 +13,21 @@ import {
 } from "@mui/material";
 import RefreshIcon from "@mui/icons-material/Refresh";
 import { useEffect, useState } from "react";
-import { isAxiosError } from "axios";
 import { buttonStyles } from "../../../shared/theme/buttons";
+import { parseAmount } from "../../../shared/utils/amount";
+import { errorDetail } from "../../../shared/utils/errors";
+import { percentToFraction } from "../../../shared/utils/percent";
 
 import {
-  getBrokers,
   getBrokerAccounts,
   refreshBrokerAccounts,
   getIndices,
   createStrategy,
 } from "../api/client";
-import type {
-  BrokerSettings,
-  BrokerAccount,
-  StockMarketIndex,
-} from "../types/strategy";
-import BrokerDialog from "./BrokerDialog";
+import { getBrokers } from "../../../shared/api/brokers";
+import type { BrokerAccount, StockMarketIndex } from "../types/strategy";
+import type { BrokerSettings } from "../../../shared/types/broker";
+import BrokerDialog from "../../../shared/components/BrokerDialog";
 
 type Props = {
   open: boolean;
@@ -44,6 +43,10 @@ export default function StrategyDialog({ open, onClose, onSave }: Props) {
   const [brokerId, setBrokerId] = useState("");
   const [accountId, setAccountId] = useState("");
   const [indexId, setIndexId] = useState("");
+  const [maxCash, setMaxCash] = useState("0");
+  // Значения по умолчанию совпадают с дефолтами в БД: 5 % и 1 лот.
+  const [delta, setDelta] = useState("5");
+  const [minLots, setMinLots] = useState("1");
 
   const [loading, setLoading] = useState(false);
   const [saving, setSaving] = useState(false);
@@ -99,12 +102,7 @@ export default function StrategyDialog({ open, onClose, onSave }: Props) {
       } catch (e) {
         console.error(e);
 
-        const detail =
-          isAxiosError(e) && typeof e.response?.data?.detail === "string"
-            ? e.response.data.detail
-            : null;
-
-        setError(detail ?? "Не удалось загрузить счета брокера");
+        setError(errorDetail(e) ?? "Не удалось загрузить счета брокера");
       }
     };
 
@@ -115,6 +113,9 @@ export default function StrategyDialog({ open, onClose, onSave }: Props) {
     setBrokerId("");
     setAccountId("");
     setIndexId("");
+    setMaxCash("0");
+    setDelta("5");
+    setMinLots("1");
     setError("");
 
     onClose();
@@ -135,12 +136,7 @@ export default function StrategyDialog({ open, onClose, onSave }: Props) {
     } catch (e) {
       console.error(e);
 
-      const detail =
-        isAxiosError(e) && typeof e.response?.data?.detail === "string"
-          ? e.response.data.detail
-          : null;
-
-      setError(detail ?? "Не удалось обновить счета брокера");
+      setError(errorDetail(e) ?? "Не удалось обновить счета брокера");
     } finally {
       setRefreshing(false);
     }
@@ -157,6 +153,13 @@ export default function StrategyDialog({ open, onClose, onSave }: Props) {
     setBrokerId(broker.id);
   };
 
+  const parsedMaxCash = parseAmount(maxCash);
+  const parsedDelta = percentToFraction(delta);
+  const parsedMinLots = parseAmount(minLots);
+
+  const settingsInvalid =
+    parsedMaxCash === null || parsedDelta === null || parsedMinLots === null;
+
   const handleSave = async () => {
     try {
       setSaving(true);
@@ -165,6 +168,9 @@ export default function StrategyDialog({ open, onClose, onSave }: Props) {
       await createStrategy({
         brokersAccountId: accountId,
         stockMarketsIndexId: indexId,
+        maxCash: parsedMaxCash ?? 0,
+        delta: parsedDelta ?? undefined,
+        minLotsToKeep: parsedMinLots ?? undefined,
       });
 
       handleClose();
@@ -172,12 +178,7 @@ export default function StrategyDialog({ open, onClose, onSave }: Props) {
     } catch (e) {
       console.error(e);
 
-      const detail =
-        isAxiosError(e) && typeof e.response?.data?.detail === "string"
-          ? e.response.data.detail
-          : null;
-
-      setError(detail ?? "Не удалось создать стратегию");
+      setError(errorDetail(e) ?? "Не удалось создать стратегию");
     } finally {
       setSaving(false);
     }
@@ -290,6 +291,48 @@ export default function StrategyDialog({ open, onClose, onSave }: Props) {
                 </MenuItem>
               ))}
             </TextField>
+
+            <TextField
+              fullWidth
+              label="Неснижаемый остаток, ₽"
+              value={maxCash}
+              onChange={(e) => setMaxCash(e.target.value)}
+              margin="normal"
+              error={parsedMaxCash === null}
+              helperText={
+                parsedMaxCash === null
+                  ? "Введите целую сумму в рублях"
+                  : "Эти деньги балансировка не тратит на покупки. 0 — тратить весь свободный кэш"
+              }
+            />
+
+            <TextField
+              fullWidth
+              label="Допустимое отклонение от индекса, %"
+              value={delta}
+              onChange={(e) => setDelta(e.target.value)}
+              margin="normal"
+              error={parsedDelta === null}
+              helperText={
+                parsedDelta === null
+                  ? "Введите отклонение в процентах, например 5"
+                  : "Пока вес бумаги отличается от индекса меньше чем на эту величину, её не трогаем"
+              }
+            />
+
+            <TextField
+              fullWidth
+              label="Минимум лотов к сохранению"
+              value={minLots}
+              onChange={(e) => setMinLots(e.target.value)}
+              margin="normal"
+              error={parsedMinLots === null}
+              helperText={
+                parsedMinLots === null
+                  ? "Введите целое число лотов"
+                  : "Сколько лотов оставить в портфеле, даже если вес бумаги превышен"
+              }
+            />
           </>
         )}
       </DialogContent>
@@ -300,7 +343,7 @@ export default function StrategyDialog({ open, onClose, onSave }: Props) {
         <Button
           sx={buttonStyles}
           onClick={handleSave}
-          disabled={!accountId || !indexId || saving}
+          disabled={!accountId || !indexId || settingsInvalid || saving}
         >
           {saving ? "Сохранение..." : "Сохранить"}
         </Button>

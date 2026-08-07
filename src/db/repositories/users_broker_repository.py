@@ -1,4 +1,5 @@
 import uuid
+from decimal import Decimal
 from typing import List, Optional
 
 from sqlalchemy import select
@@ -46,10 +47,12 @@ class UsersBrokerRepository:
         broker_name: BrokerNames,
         encrypted_token: str,
         sandbox: bool,
+        commission: Decimal | None = None,
     ) -> UsersBroker:
         """Создать или обновить настройки брокера пользователя.
 
         Токен ожидается уже зашифрованным — репозиторий не занимается шифрованием.
+        commission=None — не менять (у нового брокера останется значение по умолчанию).
         """
         broker = await self.get_by_user_and_name(user_id, broker_name)
         if broker is None:
@@ -59,10 +62,28 @@ class UsersBrokerRepository:
                 broker_token=encrypted_token,
                 sandbox=sandbox,
             )
+            if commission is not None:
+                broker.commission = commission
             self.session.add(broker)
         else:
             broker.broker_token = encrypted_token
             broker.sandbox = sandbox
+            if commission is not None:
+                broker.commission = commission
+
+        await self.session.commit()
+        await self.session.refresh(broker)
+        return broker
+
+    async def update_commission(
+        self, broker_id: uuid.UUID, user_id: uuid.UUID, commission: Decimal
+    ) -> Optional[UsersBroker]:
+        """Поменять комиссию брокера. None — брокера у пользователя нет."""
+        broker = await self.get_by_id_for_user(broker_id, user_id)
+        if broker is None:
+            return None
+
+        broker.commission = commission
 
         await self.session.commit()
         await self.session.refresh(broker)

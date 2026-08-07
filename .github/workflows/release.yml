@@ -35,6 +35,17 @@ jobs:
             ghcr.io/levbaranov/shadowtrader-back:${{ env.VERSION }}
             ghcr.io/levbaranov/shadowtrader-back:latest
 
+      - name: Build and push Docker bot image
+        uses: docker/build-push-action@v6
+        with:
+          # Контекст — только каталог бота: образ собирается независимо от бэкенда.
+          context: ./bot
+          file: ./bot.Dockerfile
+          push: true
+          tags: |
+            ghcr.io/levbaranov/shadowtrader-bot:${{ env.VERSION }}
+            ghcr.io/levbaranov/shadowtrader-bot:latest
+
       - name: Build and push Docker frontend image
         uses: docker/build-push-action@v6
         with:

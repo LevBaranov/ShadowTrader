@@ -24,8 +24,6 @@ services:
     depends_on:
       db:
         condition: service_healthy
-    volumes:
-      - ./prod.toml:/app/prod.toml
     env_file: .env
     command: alembic upgrade head
 
@@ -38,28 +36,42 @@ services:
       migrations:
         condition: service_completed_successfully
     volumes:
-      - ./prod.toml:/app/prod.toml
-      - ./scheduler_results:/scheduler_results
-      - ./logs:/app/src/api/logs
+      - ./logs/api:/app/logs
     env_file: .env
+    environment:
+      - LOG_PATH=/app/logs
     command: uvicorn src.api.main:app --host 0.0.0.0 --port 8000
     restart: unless-stopped
 
-#  app:
-#    image: ghcr.io/levbaranov/shadowtrader-back:${VERSION}
-#    container_name: shadowtrader-bot
-#    depends_on:
-#      db:
-#        condition: service_healthy
-#      migrations:
-#        condition: service_completed_successfully
-#    volumes:
-#      - ./prod.toml:/app/prod.toml
-#      - ./scheduler_results:/scheduler_results
-#      - ./logs:/src/bot/logs
-#    env_file: .env
-#    command: python src/main.py
-#    restart: unless-stopped
+  # Отдельный образ: у бота нет доступа ни к БД, ни к коду бэкенда — только API.
+  bot:
+    image: ghcr.io/levbaranov/shadowtrader-bot:${VERSION}
+    container_name: shadowtrader-bot
+    depends_on:
+      - api
+    volumes:
+      - ./logs/bot:/app/logs
+    env_file: .env
+    environment:
+      - API_BASE_URL=http://api:8000
+      - LOG_PATH=/app/logs
+    restart: unless-stopped
+
+  scheduler:
+    image: ghcr.io/levbaranov/shadowtrader-back:${VERSION}
+    container_name: shadowtrader-scheduler
+    depends_on:
+      db:
+        condition: service_healthy
+      migrations:
+        condition: service_completed_successfully
+    volumes:
+      - ./logs/scheduler:/app/logs
+    env_file: .env
+    environment:
+      - LOG_PATH=/app/logs
+    command: python -m src.scheduler.main
+    restart: unless-stopped
 
   ui:
     image: ghcr.io/levbaranov/shadowtrader-ui:${VERSION}

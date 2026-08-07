@@ -1,9 +1,3 @@
-export type BrokerSettings = {
-  id: string;
-  brokerName: string;
-  sandbox: boolean;
-};
-
 export type BrokerAccount = {
   id: string;
   accountId: string;

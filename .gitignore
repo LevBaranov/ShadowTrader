@@ -2,7 +2,6 @@
 .env-dev
 *.toml
 *.jsonl
-*.txt
 
 __pycache__
 *.jar

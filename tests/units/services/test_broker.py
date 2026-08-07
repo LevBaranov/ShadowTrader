@@ -14,19 +14,6 @@ class TestTBroker:
         with open(os.path.join(TEST_DATA_DIR, filename), "r") as f:
             return json.load(f)
 
-    # @pytest.fixture(autouse=True)
-    # def disable_cache(self, monkeypatch):
-    #     """Фикстура для отключения кэширования во всех тестах класса"""
-    #
-    #     def no_cache_decorator(ttl_seconds):
-    #         def decorator(func):
-    #             return func
-    #
-    #         return decorator
-    #
-    #     # Подменяем ДО любого импорта TBroker
-    #     monkeypatch.setattr("src.services.utils.cache_data", no_cache_decorator)
-
     def test_init_sandbox(self):
         from t_tech.invest.constants import INVEST_GRPC_API_SANDBOX
         from src.services.broker import TBroker
@@ -170,6 +157,40 @@ class TestTAccount:
         assert isinstance(positions, Positions)
         assert positions.cash is None
         assert positions.shares == []
+
+    def test_get_positions_account_not_found(self):
+        from grpc import StatusCode
+        from t_tech.invest import RequestError
+        from src.services.broker import TAccount, BrokerAccountNotFoundError
+
+        broker = MagicMock()
+        client = MagicMock()
+
+        error = RequestError(StatusCode.NOT_FOUND, "50004", MagicMock(message="Account not found"))
+        client.operations.get_positions.side_effect = error
+        broker.get_client.return_value.__enter__.return_value = client
+
+        account = TAccount(account_id="acc_gone", broker=broker)
+
+        with pytest.raises(BrokerAccountNotFoundError):
+            account.get_positions()
+
+    def test_get_positions_other_request_error_reraised(self):
+        from grpc import StatusCode
+        from t_tech.invest import RequestError
+        from src.services.broker import TAccount
+
+        broker = MagicMock()
+        client = MagicMock()
+
+        error = RequestError(StatusCode.INTERNAL, "50000", MagicMock(message="Internal error"))
+        client.operations.get_positions.side_effect = error
+        broker.get_client.return_value.__enter__.return_value = client
+
+        account = TAccount(account_id="acc_6", broker=broker)
+
+        with pytest.raises(RequestError):
+            account.get_positions()
 
     def test_create_order_buy(self):
         from src.services.broker import TAccount

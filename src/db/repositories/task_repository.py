@@ -13,8 +13,8 @@ class TaskRepository:
     def __init__(self, db: AsyncSession):
         self.db = db
 
-    async def get_tasks(self) -> list[Task]:
-        stmt = select(Task)
+    async def get_active_tasks(self) -> list[Task]:
+        stmt = select(Task).where(Task.disabled_date.is_(None))
         result = await self.db.scalars(stmt)
 
         return list(result)
@@ -65,10 +65,10 @@ class TaskRepository:
 
         return task_result
 
-    async def get_user_tasks(self, user_telegram_id: int, **params_filters) -> list[Task]:
-
-        stmt = (select(Task).join(User)
-                .where(User.telegram_id == user_telegram_id)
+    async def get_user_tasks(self, user_id: uuid.UUID, **params_filters) -> list[Task]:
+        """Активные задачи пользователя, опционально с фильтрами по params."""
+        stmt = (select(Task)
+                .where(Task.user_id == user_id)
                 .where(Task.disabled_date.is_(None)))
 
         for key, value in params_filters.items():
@@ -83,6 +83,27 @@ class TaskRepository:
 
         result = await self.db.scalars(stmt)
         return list(result)
+
+    async def update_task(
+            self,
+            task_id: uuid.UUID,
+            frequency: ScheduleFrequency | None = None,
+            params: dict | None = None
+    ) -> Task:
+        """Обновить расписание и/или настройки задачи. None — поле не меняем."""
+        task = await self.get_task(task_id)
+
+        if frequency is not None:
+            task.frequency = frequency
+        if params is not None:
+            task.params = params
+
+        task.updated_at = datetime.now()
+
+        await self.db.commit()
+        await self.db.refresh(task)
+
+        return task
 
     async def disable_task(self, task_id: uuid.UUID) -> Task:
 

@@ -1,9 +1,18 @@
 import { Box, Button } from "@mui/material";
 import { useLocation, useNavigate } from "react-router-dom";
 
+import { useAuth } from "../../app/AuthContext";
+
+const NAV_ITEMS = [
+  { path: "/", label: "Отслеживание" },
+  { path: "/bonds", label: "Облигации" },
+  { path: "/settings", label: "Настройки" },
+];
+
 export default function Header() {
   const nav = useNavigate();
   const location = useLocation();
+  const { logout } = useAuth();
 
   const isActive = (path: string) => location.pathname === path;
 
@@ -12,32 +21,27 @@ export default function Header() {
       sx={{
         display: "flex",
         justifyContent: "flex-end",
-        mb: 3
+        gap: 1,
+        mb: 3,
       }}
     >
-      <Button
-        variant={isActive("/") ? "contained" : "outlined"}
-        onClick={() => nav("/")}
-        sx={{
-          mr: 1,
-          color: "#444",
-          borderColor: "#888",
-          background: isActive("/") ? "#bbb" : "transparent",
-        }}
-      >
-        Отслеживание
-      </Button>
+      {NAV_ITEMS.map((item) => (
+        <Button
+          key={item.path}
+          variant={isActive(item.path) ? "contained" : "outlined"}
+          onClick={() => nav(item.path)}
+          sx={{
+            color: "#444",
+            borderColor: "#888",
+            background: isActive(item.path) ? "#bbb" : "transparent",
+          }}
+        >
+          {item.label}
+        </Button>
+      ))}
 
-      <Button
-        variant={isActive("/bonds") ? "contained" : "outlined"}
-        onClick={() => nav("/bonds")}
-        sx={{
-          color: "#444",
-          borderColor: "#888",
-          background: isActive("/bonds") ? "#bbb" : "transparent",
-        }}
-      >
-        Облигации
+      <Button onClick={logout} sx={{ color: "#444" }}>
+        Выйти
       </Button>
     </Box>
   );

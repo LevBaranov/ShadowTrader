@@ -26,26 +26,44 @@ services:
     depends_on:
       db:
         condition: service_healthy
-    volumes:
-      - ./dev.toml:/app/dev.toml
     env_file: .env-dev
     command: alembic upgrade head
-#
-#  app:
-#    build: .
-#    container_name: shadowtrader-app-dev
-#    depends_on:
-#      db:
-#        condition: service_healthy
-#      migrations:
-#        condition: service_completed_successfully
-#    volumes:
-#      - ./logs:/app/src/bot/logs
-#      - ./scheduler_results:/scheduler_results
-#      - ./dev.toml:/app/dev.toml
-#    env_file: .env-dev
-#    command: python src/main.py
-#    restart: unless-stopped
+
+  # Отдельный образ и отдельный контекст сборки: бэкенд боту не виден.
+  bot:
+    build:
+      context: ./bot
+      dockerfile: ../bot.Dockerfile
+    container_name: shadowtrader-bot-dev
+    depends_on:
+      - api
+    volumes:
+      - ./bot:/app/bot
+      - ./logs/bot:/app/logs
+    env_file: .env-dev
+    environment:
+      - API_BASE_URL=http://api:8000
+      - LOG_PATH=/app/logs
+    restart: unless-stopped
+
+  scheduler:
+    build:
+      context: .
+      dockerfile: backend.Dockerfile
+    container_name: shadowtrader-scheduler-dev
+    depends_on:
+      db:
+        condition: service_healthy
+      migrations:
+        condition: service_completed_successfully
+    volumes:
+      - ./src:/app/src
+      - ./logs/scheduler:/app/logs
+    env_file: .env-dev
+    environment:
+      - LOG_PATH=/app/logs
+    command: python -m src.scheduler.main
+    restart: unless-stopped
 
   api:
     build:
@@ -59,10 +77,10 @@ services:
         condition: service_completed_successfully
     volumes:
       - ./src:/app/src
-      - ./logs/api:/app/src/api/logs
-      - ./scheduler_results:/scheduler_results
-      - ./prod.toml:/app/dev.toml
+      - ./logs/api:/app/logs
     env_file: .env-dev
+    environment:
+      - LOG_PATH=/app/logs
     ports:
       - 8000:8000
     command: uvicorn src.api.main:app --host 0.0.0.0 --port 8000

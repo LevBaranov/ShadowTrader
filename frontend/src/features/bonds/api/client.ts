@@ -1,9 +1,14 @@
+import api from "../../../shared/api/client";
+import type { BondWithEvents } from "../types/bond";
 
-const mockBonds = [
-  { id: 1, name: "OFZ 262XX", date: "2026-05-12", type: "Погашение" },
-  { id: 2, name: "BOND123", date: "2026-05-01", type: "Купон" },
-];
+/**
+ * Облигации на счёте, по которым впереди оферта или колл-опцион.
+ * Счёт — любой свой, со стратегиями не связан.
+ */
+export const getBondEvents = async (brokersAccountId: string) => {
+  const res = await api.get<BondWithEvents[]>("/bonds/events", {
+    params: { brokersAccountId },
+  });
 
-export const getBonds = async () => {
-  return Promise.resolve(mockBonds);
+  return res.data;
 };

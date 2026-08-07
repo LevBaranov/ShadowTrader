@@ -1,8 +1,7 @@
 import pandas as pd
 from typing import List, Tuple, Dict
 
-from src.config import settings
-
+from src.models.balancer_params import BalancerParams
 from src.models.positions import Positions
 from src.models.index import Index
 from src.models.rebalance import CalculatedPosition
@@ -14,19 +13,21 @@ class Balancer:
 
     """
 
-    def __init__(self, positions: Positions, index: Index,
-                 delta: float = settings.balancer.delta,
-                 commission: float = settings.balancer.commission,
-                 min_lots_to_keep: float = settings.balancer.min_lots_to_keep,
-                 ):
+    def __init__(self, positions: Positions, index: Index, params: BalancerParams):
+        """
+        :param params: Параметры расчёта — настройки пользователя из БД
+            (комиссия с брокера, остальное со стратегии). Дефолтов у балансировщика
+            нет намеренно: расчёт не должен молча посчитаться «по общим» значениям.
+        """
         self.actions = []
         self.positions = positions
         self.index = index
         self.free_cash = positions.cash.to_float()
 
-        self.delta = delta
-        self.commission = commission
-        self.min_lots_to_keep = min_lots_to_keep
+        self.delta = float(params.delta)
+        self.commission = float(params.commission)
+        self.min_lots_to_keep = params.min_lots_to_keep
+        self.max_cash = float(params.max_cash)
 
         self.calculated_positions: list[CalculatedPosition] = []
 
@@ -174,7 +175,8 @@ class Balancer:
                 lot_price = row['lot_size'] * row['last_price']
                 total_cost = lot_price * (1 + self.commission)
 
-                if total_cost < self.free_cash:
+                # Неснижаемый остаток max_cash на покупки не тратим.
+                if total_cost < self.free_cash - self.max_cash:
                     if ticker in portfolio_df.index:
                         portfolio_df.at[ticker, 'balance'] += row['lot_size']
                     else:

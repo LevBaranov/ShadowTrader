@@ -13,15 +13,6 @@ class Cash:
 class PositionsCash(Cash):
     currency: str
 
-# @dataclass()
-# class PositionsShare:
-#     share_uid: str
-#     figi: str
-#     balance: int
-#     last_price: Cash
-#     lot_size: int
-#     ticker: str
-
 @dataclass()
 class PositionsInstrument:
     """

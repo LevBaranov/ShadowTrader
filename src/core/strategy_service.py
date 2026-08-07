@@ -1,6 +1,7 @@
 import logging
 import uuid
 from datetime import timedelta
+from decimal import Decimal
 from typing import List
 
 from starlette.concurrency import run_in_threadpool
@@ -26,6 +27,18 @@ class StrategyValidationError(Exception):
 
 class StrategyNotFoundError(Exception):
     """Стратегия не найдена у пользователя."""
+
+
+def _validate_settings(
+    max_cash: int, delta: Decimal | None, min_lots_to_keep: int | None
+) -> None:
+    """delta — доля (0.05 = 5 %), а не проценты: границу проверяем и здесь, не только в DTO."""
+    if max_cash < 0:
+        raise StrategyValidationError("max_cash must be non-negative")
+    if delta is not None and not (0 <= delta < 1):
+        raise StrategyValidationError("delta must be a fraction in [0, 1): 0.05 means 5%")
+    if min_lots_to_keep is not None and min_lots_to_keep < 0:
+        raise StrategyValidationError("min_lots_to_keep must be non-negative")
 
 
 class StrategyService:
@@ -64,7 +77,12 @@ class StrategyService:
         brokers_account_id: uuid.UUID,
         stock_markets_index_id: uuid.UUID,
         strategy_type: StrategiesType,
+        max_cash: int = 0,
+        delta: Decimal | None = None,
+        min_lots_to_keep: int | None = None,
     ) -> UsersStrategy:
+        _validate_settings(max_cash, delta, min_lots_to_keep)
+
         # Аккаунт должен принадлежать пользователю.
         account = await self.accounts_repo.get_for_user(brokers_account_id, user.id)
         if account is None:
@@ -84,7 +102,38 @@ class StrategyService:
             strategy_type=strategy_type,
             brokers_account_id=brokers_account_id,
             stock_markets_index_id=stock_markets_index_id,
+            max_cash=max_cash,
+            delta=delta,
+            min_lots_to_keep=min_lots_to_keep,
         )
+
+    async def update_settings(
+        self,
+        user,
+        strategy_id: uuid.UUID,
+        max_cash: int,
+        delta: Decimal,
+        min_lots_to_keep: int,
+    ) -> UsersStrategy:
+        """Настройки расчёта по стратегии.
+
+        Комиссия сюда не входит — это тариф брокера (users_broker.commission).
+        """
+        _validate_settings(max_cash, delta, min_lots_to_keep)
+
+        strategy = await self.strategy_repo.update_settings(
+            user.id,
+            strategy_id,
+            max_cash=max_cash,
+            delta=delta,
+            min_lots_to_keep=min_lots_to_keep,
+        )
+        if strategy is None:
+            raise StrategyNotFoundError(
+                f"Strategy {strategy_id} not found for user {user.id}"
+            )
+
+        return strategy
 
     async def delete_strategy(self, user, strategy_id: uuid.UUID) -> None:
         deleted = await self.strategy_repo.delete(user.id, strategy_id)

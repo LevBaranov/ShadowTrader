@@ -1,7 +1,6 @@
 import api from "../../../shared/api/client";
 import type { CurrentUserInfo } from "../types/user";
 import type {
-  BrokerSettings,
   BrokerAccount,
   StockMarketIndex,
   RebalanceExecutionResult,
@@ -68,21 +67,6 @@ export const executeRebalance = async (
 };
 
 
-export const saveBroker = async (params: {
-  brokerName: string;
-  token: string;
-}) => {
-  const res = await api.put<BrokerSettings>("/brokers", params);
-
-  return res.data;
-};
-
-export const getBrokers = async () => {
-  const res = await api.get<BrokerSettings[]>("/brokers");
-
-  return res.data;
-};
-
 export const getBrokerAccounts = async (brokerId: string) => {
   const res = await api.get<BrokerAccount[]>(
     `/brokers/${brokerId}/accounts`
@@ -108,8 +92,26 @@ export const getIndices = async () => {
 export const createStrategy = async (params: {
   brokersAccountId: string;
   stockMarketsIndexId: string;
+  /** Неснижаемый остаток денег: балансировщик его не тратит на покупки. */
+  maxCash?: number;
+  /** Допустимое отклонение от веса в индексе, долей (0.05 = 5 %). */
+  delta?: number;
+  minLotsToKeep?: number;
 }) => {
   const res = await api.post("/strategies", params);
+
+  return res.data;
+};
+
+/**
+ * Настройки расчёта по стратегии. Счёт и индекс не меняются — это новая
+ * стратегия. Комиссия здесь не участвует: это тариф брокера (updateBroker).
+ */
+export const updateStrategy = async (
+  strategyId: string,
+  params: { maxCash: number; delta: number; minLotsToKeep: number }
+) => {
+  const res = await api.patch(`/strategies/${strategyId}`, params);
 
   return res.data;
 };

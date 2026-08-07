@@ -39,6 +39,14 @@ class RebalanceResult(BaseApiModel):
     errors:  List[RebalanceErrorResult]
 
 
+class RebalancePreviewResponse(BaseApiModel):
+    """Превью балансировки в API: план действий без исполнения."""
+    portfolio: List[PortfolioPosition]
+    free_cash: float
+    free_cash_after: float
+    actions: List[RebalanceActionResult]
+
+
 class RebalancePreview(BaseModel):
     actions: List[Action]
     # Свободные средства на счёте сейчас.

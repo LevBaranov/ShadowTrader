@@ -14,15 +14,18 @@ def hash_password(password: str) -> str:
 def verify_password(password: str, password_hash: str) -> bool:
     return pwd_context.verify(password, password_hash)
 
-def create_access_token(user_id: str) -> str:
+def create_access_token(user_id: str, expires_minutes: int | None = None) -> str:
     now = datetime.now(timezone.utc)
+
+    if expires_minutes is None:
+        expires_minutes = api_settings.ACCESS_TOKEN_EXPIRE_MINUTES
 
     payload = {
         "sub": user_id,
         "iss": api_settings.JWT_ISSUER,
         "aud": api_settings.JWT_AUDIENCE,
         "iat": now,
-        "exp": now + timedelta(minutes=api_settings.ACCESS_TOKEN_EXPIRE_MINUTES),
+        "exp": now + timedelta(minutes=expires_minutes),
         "jti": str(uuid.uuid4()),
     }
 

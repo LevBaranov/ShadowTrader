@@ -1,4 +1,5 @@
 import uuid
+from decimal import Decimal
 from typing import List
 
 from starlette.concurrency import run_in_threadpool
@@ -14,6 +15,22 @@ from src.models.broker_names import BrokerNames
 
 class BrokerNotFoundError(Exception):
     """Брокер не найден у пользователя."""
+
+
+class BrokerValidationError(Exception):
+    """Некорректные настройки брокера."""
+
+
+def _validate_commission(commission: Decimal) -> None:
+    """Комиссия — доля, а не проценты: 0.003 (0,3 %), но не 0.3 и не 3.
+
+    Верхняя граница отсекает случай, когда клиент прислал проценты вместо доли:
+    комиссии в 100 % не бывает, а вот «0.3» вместо «0.003» — типичная ошибка.
+    """
+    if commission < 0 or commission >= 1:
+        raise BrokerValidationError(
+            "commission must be a fraction in [0, 1): 0.003 means 0.3%"
+        )
 
 
 class BrokerService:
@@ -36,6 +53,7 @@ class BrokerService:
         broker_name: BrokerNames,
         token: str,
         sandbox: bool,
+        commission: Decimal | None = None,
     ) -> UsersBroker:
         """Сохранить настройки брокера пользователя.
 
@@ -43,7 +61,13 @@ class BrokerService:
         невалидный токен (BrokerAuthError) до БД не доходит.
         Токен шифруется здесь, до попадания в репозиторий/БД — в открытом виде
         он в хранилище не уходит.
+
+        commission=None — комиссию не меняем: у нового брокера останется значение
+        по умолчанию, у существующего — то, что уже сохранено.
         """
+        if commission is not None:
+            _validate_commission(commission)
+
         client = self.broker_client_factory(token=token, sandbox=sandbox)
         # Запрос к брокеру синхронный (блокирующий gRPC) — уводим в threadpool.
         # Бросает BrokerAuthError, если токен недействителен.
@@ -55,7 +79,22 @@ class BrokerService:
             broker_name=broker_name,
             encrypted_token=encrypted_token,
             sandbox=sandbox,
+            commission=commission,
         )
+
+    async def update_commission(
+        self, user, broker_id: uuid.UUID, commission: Decimal
+    ) -> UsersBroker:
+        """Поменять комиссию брокера — без токена и без обращения к брокеру."""
+        _validate_commission(commission)
+
+        broker = await self.broker_repo.update_commission(
+            broker_id, user.id, commission
+        )
+        if broker is None:
+            raise BrokerNotFoundError(str(broker_id))
+
+        return broker
 
     async def list_brokers(self, user) -> List[UsersBroker]:
         """Список брокеров пользователя (без токенов)."""
@@ -92,6 +131,29 @@ class BrokerService:
             raise BrokerNotFoundError(f"Broker {broker_id} not found for user {user.id}")
 
         return await self._sync_accounts_from_broker(broker)
+
+    async def list_all_accounts(self, user) -> List[BrokersAccount]:
+        """Все счета пользователя по всем его брокерам одним списком.
+
+        Нужен там, где брокер не важен: выбор счёта для проверки облигаций,
+        раздел настроек. Счета брокера, которых ещё нет в БД, подтягиваются.
+        """
+        accounts: List[BrokersAccount] = []
+        for broker in await self.broker_repo.list_for_user(user.id):
+            broker_accounts = await self.accounts_repo.get_by_broker(broker.id)
+            if not broker_accounts:
+                broker_accounts = await self._sync_accounts_from_broker(broker)
+            accounts.extend(broker_accounts)
+
+        return accounts
+
+    async def refresh_all_accounts(self, user) -> List[BrokersAccount]:
+        """Принудительно обновить счета по всем брокерам пользователя."""
+        accounts: List[BrokersAccount] = []
+        for broker in await self.broker_repo.list_for_user(user.id):
+            accounts.extend(await self._sync_accounts_from_broker(broker))
+
+        return accounts
 
     async def get_busy_account_ids(self, accounts: List[BrokersAccount]) -> set:
         """Id счетов из переданных, на которых уже есть стратегия."""

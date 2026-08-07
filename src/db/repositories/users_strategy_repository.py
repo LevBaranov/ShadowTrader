@@ -1,4 +1,6 @@
 import uuid
+from decimal import Decimal
+
 from sqlalchemy import select, delete
 from sqlalchemy.ext.asyncio import AsyncSession
 from typing import Iterable, List, Optional, Set
@@ -58,16 +60,48 @@ class UsersStrategyRepository:
         strategy_type: StrategiesType,
         brokers_account_id: uuid.UUID,
         stock_markets_index_id: uuid.UUID,
+        max_cash: int = 0,
+        delta: Decimal | None = None,
+        min_lots_to_keep: int | None = None,
     ) -> UsersStrategy:
         strategy = UsersStrategy(
             user_id=user_id,
             strategy_type=strategy_type,
             brokers_account_id=brokers_account_id,
             stock_markets_index_id=stock_markets_index_id,
+            max_cash=max_cash,
         )
+        # None — оставляем значение по умолчанию из модели/БД.
+        if delta is not None:
+            strategy.delta = delta
+        if min_lots_to_keep is not None:
+            strategy.min_lots_to_keep = min_lots_to_keep
+
         self.session.add(strategy)
         await self.session.commit()
         await self.session.refresh(strategy)
+        return strategy
+
+    async def update_settings(
+        self,
+        user_id: uuid.UUID,
+        strategy_id: uuid.UUID,
+        max_cash: int,
+        delta: Decimal,
+        min_lots_to_keep: int,
+    ) -> Optional[UsersStrategy]:
+        """Поменять настройки расчёта. None — стратегии у пользователя нет."""
+        strategy = await self.get_user_strategy(user_id, strategy_id)
+        if strategy is None:
+            return None
+
+        strategy.max_cash = max_cash
+        strategy.delta = delta
+        strategy.min_lots_to_keep = min_lots_to_keep
+
+        await self.session.commit()
+        await self.session.refresh(strategy)
+
         return strategy
 
     async def delete(self, user_id: uuid.UUID, strategy_id: uuid.UUID) -> bool:

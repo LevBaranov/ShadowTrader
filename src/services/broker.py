@@ -3,6 +3,7 @@ from typing import List, Dict, Optional
 from contextlib import contextmanager
 from dataclasses import asdict
 
+from grpc import StatusCode
 from t_tech.invest import RequestError
 from t_tech.invest.exceptions import UnauthenticatedError
 from t_tech.invest.grpc import Client, OrderDirection, OrderType
@@ -11,7 +12,7 @@ from t_tech.invest.constants import INVEST_GRPC_API_SANDBOX
 
 from src.models.instrument import InstrumentBase
 
-# from src.services.utils import cache_data, log_response
+from src.logging_setup import integration_call
 
 from src.models.account import Account
 from src.models.positions import Positions, PositionsCash, Cash, PositionsInstrument
@@ -22,6 +23,14 @@ from src.models.error import Error
 
 class BrokerAuthError(Exception):
     """Токен брокера отсутствует или недействителен."""
+
+
+class BrokerAccountNotFoundError(Exception):
+    """Счёт не найден у брокера: удалён/закрыт на его стороне, но ещё числится у нас."""
+
+
+# Имя интеграции в логах: пишется в logs/broker.log.
+SERVICE = "broker"
 
 
 class TBroker:
@@ -52,36 +61,40 @@ class TBroker:
             Возвращает список всех аккаунтов доступных в брокере
         :return: List[Account]
         """
-        try:
-            with self.get_client() as client:
-                accounts = client.users.get_accounts().accounts
-        except UnauthenticatedError as exc:
-            raise BrokerAuthError("Broker token is invalid") from exc
+        with integration_call(SERVICE, "get_accounts", sandbox=bool(self.target)) as call:
+            try:
+                with self.get_client() as client:
+                    accounts = client.users.get_accounts().accounts
+            except UnauthenticatedError as exc:
+                raise BrokerAuthError("Broker token is invalid") from exc
 
-        return [Account(id=a.id, name=a.name) for a in accounts]
+            result = [Account(id=a.id, name=a.name) for a in accounts]
+            call.add(count=len(result))
+            call.detail(accounts=[a.id for a in result])
 
-    # @log_response()
-    # @cache_data(ttl_seconds=86400)
+            return result
+
     def get_all_shares(self) -> ShareList:
         """
         Возвращает список акций с их дополнительной информацией.
         :return: ShareList
         """
-        shares = []
-        with self.get_client() as client:
-            instruments = client.instruments
-            shares = [
-                Share(f.uid, f.figi, f.ticker, f.lot, f.isin, "share")
-                for f in instruments.shares().instruments if f.currency == 'rub'
-            ]
-            for share in shares:
-                self._shares_by_uid[share.uid] = share
-                self._shares_by_ticker[share.ticker] = share
+        with integration_call(SERVICE, "get_all_shares") as call:
+            with self.get_client() as client:
+                instruments = client.instruments
+                shares = [
+                    Share(f.uid, f.figi, f.ticker, f.lot, f.isin, "share")
+                    for f in instruments.shares().instruments if f.currency == 'rub'
+                ]
+                for share in shares:
+                    self._shares_by_uid[share.uid] = share
+                    self._shares_by_ticker[share.ticker] = share
 
-        return ShareList(shares)
+            call.add(count=len(shares))
+            call.detail(tickers=[share.ticker for share in shares])
 
+            return ShareList(shares)
 
-    # @log_response()
     def find_share(self, value: str, field: str = "uid") -> Optional[Share]:
         """
         Метод для поиска информации об акции. Может принимать на вход uid или ticker
@@ -105,7 +118,6 @@ class TBroker:
 
         return result
 
-    # @log_response()
     def find_instrument(self, value: str, field: str = "uid") -> Optional[InstrumentBase]:
         """
         Метод для поиска информации об облигациях. Может принимать на вход uid или ticker
@@ -129,33 +141,38 @@ class TBroker:
 
         return result
 
-    # @log_response()
     def get_all_instruments(self) -> list[InstrumentBase]:
         """
         Возвращает список всех инструментов с их дополнительной информацией.
         :return: Список инструментов с их базовой информацией
         """
-        all_instruments = []
-        with self.get_client() as client:
-            broker_instruments = client.instruments
+        with integration_call(SERVICE, "get_all_instruments") as call:
+            all_instruments = []
+            bonds_count = 0
+            with self.get_client() as client:
+                broker_instruments = client.instruments
 
-            for _i in broker_instruments.bonds().instruments:
-                if _i.currency == 'rub':
-                    instrument = InstrumentBase(_i.uid, _i.figi, _i.ticker, _i.lot, _i.isin, "bond")
-                    self._instruments_by_uid[instrument.uid] = instrument
-                    self._instruments_by_ticker[instrument.ticker] = instrument
+                for _i in broker_instruments.bonds().instruments:
+                    if _i.currency == 'rub':
+                        instrument = InstrumentBase(_i.uid, _i.figi, _i.ticker, _i.lot, _i.isin, "bond")
+                        self._instruments_by_uid[instrument.uid] = instrument
+                        self._instruments_by_ticker[instrument.ticker] = instrument
 
-                    all_instruments.append(instrument)
+                        all_instruments.append(instrument)
+                        bonds_count += 1
 
-            for _i in broker_instruments.shares().instruments:
-                if _i.currency == 'rub':
-                    instrument = InstrumentBase(_i.uid, _i.figi, _i.ticker, _i.lot, _i.isin, "share")
-                    self._instruments_by_uid[instrument.uid] = instrument
-                    self._instruments_by_ticker[instrument.ticker] = instrument
+                for _i in broker_instruments.shares().instruments:
+                    if _i.currency == 'rub':
+                        instrument = InstrumentBase(_i.uid, _i.figi, _i.ticker, _i.lot, _i.isin, "share")
+                        self._instruments_by_uid[instrument.uid] = instrument
+                        self._instruments_by_ticker[instrument.ticker] = instrument
 
-                    all_instruments.append(instrument)
+                        all_instruments.append(instrument)
 
-        return all_instruments
+            call.add(bonds=bonds_count, shares=len(all_instruments) - bonds_count)
+            call.detail(tickers=[instrument.ticker for instrument in all_instruments])
+
+            return all_instruments
 
 
 
@@ -185,51 +202,65 @@ class TAccount:
                         )
 
 
-        with self.broker.get_client() as client:
-            request = PositionsRequest(account_id=self.account_id)
-            positions = client.operations.get_positions(request)
+        with integration_call(SERVICE, "get_positions", account=self.account_id) as call:
+            with self.broker.get_client() as client:
+                request = PositionsRequest(account_id=self.account_id)
+                try:
+                    positions = client.operations.get_positions(request)
+                except RequestError as e:
+                    if e.code == StatusCode.NOT_FOUND:
+                        raise BrokerAccountNotFoundError(
+                            f"Account {self.account_id} not found in broker"
+                        ) from e
+                    raise
 
-            if not positions.securities:
-                return Positions(cash=PositionsCash(**asdict(positions.money[0])) if positions.money else None,
-                                 shares=[])
+                if not positions.securities:
+                    call.add(securities=0)
+                    return Positions(cash=PositionsCash(**asdict(positions.money[0])) if positions.money else None,
+                                     shares=[])
 
-            # Матчим акции и баланс
-            instrument_uids = []
-            instrument_balance = []
-            for _position in positions.securities:
-                if _position.instrument_type in ["share", "bond"]:
-                    instrument_uids.append(_position.instrument_uid)
-                    instrument = self.broker.find_instrument(_position.instrument_uid)
+                # Матчим акции и баланс
+                instrument_uids = []
+                instrument_balance = []
+                for _position in positions.securities:
+                    if _position.instrument_type in ["share", "bond"]:
+                        instrument_uids.append(_position.instrument_uid)
+                        instrument = self.broker.find_instrument(_position.instrument_uid)
 
-                    # TODO: Возможно логика лишняя и требует удаления
-                    if instrument:  # Проблема с BBG007N0Z367. Его нет в списке всех акций, но в портфеле он остался, хоть и продан
-                        instrument_balance.append((instrument, _position.balance))
+                        # TODO: Возможно логика лишняя и требует удаления
+                        if instrument:  # Проблема с BBG007N0Z367. Его нет в списке всех акций, но в портфеле он остался, хоть и продан
+                            instrument_balance.append((instrument, _position.balance))
 
-            # Получаем информацию о последних ценах
-            last_prices = {
-                last_price.instrument_uid: last_price.price
-                for last_price in client.market_data.get_last_prices(
-                    GetLastPricesRequest(instrument_id=[p.instrument_uid for p in positions.securities])
-                ).last_prices
-            }
+                # Получаем информацию о последних ценах
+                last_prices = {
+                    last_price.instrument_uid: last_price.price
+                    for last_price in client.market_data.get_last_prices(
+                        GetLastPricesRequest(instrument_id=[p.instrument_uid for p in positions.securities])
+                    ).last_prices
+                }
 
-            shares_positions = []
-            bonds_positions = []
-            for _instrument, _balance in instrument_balance:
-                if _instrument.type == "share":
-                    shares_positions.append(
-                        create_position_instrument(_instrument, _balance, last_prices.get(_instrument.uid))
-                    )
-                if _instrument.type == "bond":
-                    bonds_positions.append(
-                        create_position_instrument(_instrument, _balance, last_prices.get(_instrument.uid))
-                    )
+                shares_positions = []
+                bonds_positions = []
+                for _instrument, _balance in instrument_balance:
+                    if _instrument.type == "share":
+                        shares_positions.append(
+                            create_position_instrument(_instrument, _balance, last_prices.get(_instrument.uid))
+                        )
+                    if _instrument.type == "bond":
+                        bonds_positions.append(
+                            create_position_instrument(_instrument, _balance, last_prices.get(_instrument.uid))
+                        )
 
-        return Positions(
-            cash=PositionsCash(**asdict(positions.money[0])) if positions.money else None,
-            shares=shares_positions,
-            bonds=bonds_positions
-        )
+            result = Positions(
+                cash=PositionsCash(**asdict(positions.money[0])) if positions.money else None,
+                shares=shares_positions,
+                bonds=bonds_positions
+            )
+
+            call.add(shares=len(shares_positions), bonds=len(bonds_positions))
+            call.detail(positions=asdict(result))
+
+            return result
 
     def create_order(self, action: Action):
         """
@@ -239,72 +270,32 @@ class TAccount:
         """
         type_order = OrderDirection.ORDER_DIRECTION_BUY if action.type == "BUY" else OrderDirection.ORDER_DIRECTION_SELL
         order_id = str(uuid.uuid4())
-        with self.broker.get_client() as client:
-            try:
-                request = PostOrderRequest(
-                    instrument_id=action.share.uid,
-                    quantity=action.quantity,
-                    # price=price,
-                    direction=type_order,
-                    account_id=self.account_id,
-                    order_type=OrderType.ORDER_TYPE_BESTPRICE,  # TODO: Добавить другие типы
-                    order_id=order_id
-                )
-                return client.orders.post_order(request)
 
-            except RequestError as e:
-                raise Error(source="Broker", source_data=e, data=action, description=e.metadata.message)
+        with integration_call(
+                SERVICE, "create_order",
+                account=self.account_id,
+                ticker=action.share.ticker,
+                type=action.type,
+                quantity=action.quantity,
+                order_id=order_id,
+        ) as call:
+            with self.broker.get_client() as client:
+                try:
+                    request = PostOrderRequest(
+                        instrument_id=action.share.uid,
+                        quantity=action.quantity,
+                        # price=price,
+                        direction=type_order,
+                        account_id=self.account_id,
+                        order_type=OrderType.ORDER_TYPE_BESTPRICE,  # TODO: Добавить другие типы
+                        order_id=order_id
+                    )
+                    response = client.orders.post_order(request)
 
+                except RequestError as e:
+                    raise Error(source="Broker", source_data=e, data=action, description=e.metadata.message)
 
+                call.detail(response=str(response))
 
-if __name__ == "__main__":
-    import pprint
+                return response
 
-
-    br = TBroker("t.KXjyJ5qT5DYhUJi76tt7zXKSanYo5PDAset4VfAMOfXpJfbZvvqUg5GVqMjDG_611P_U3RXBIQXghPiOS1L_Dw", True)
-    # print(br.find_share("SBER", "ticker"))
-    # pprint.pprint(br.get_all_shares())
-    ####################################
-    ### For sandbox method create account
-    ####################################
-    # from decimal import Decimal
-    # from t_tech.invest import MoneyValue
-    # from t_tech.invest.utils import decimal_to_quotation
-    #
-    # with br.get_client() as client:
-    #     # account = client.sandbox.open_sandbox_account()
-    #     for account in br.get_all_accounts():
-    #         print(account)
-    #         # money = decimal_to_quotation(Decimal(10000))
-    #         # client.sandbox.sandbox_pay_in(
-    #         #     account_id=account.id,
-    #         #     amount=MoneyValue(units=money.units,
-    #         #                       nano=money.nano,
-    #         #                       currency='rub'),
-    #         # )
-    #####################################
-    accs = br.get_all_accounts()
-    print(accs)
-    ac = TAccount(accs[0].id, br)
-    ####################################
-    ### For sandbox method create order
-    ####################################
-    # instr = br.find_instrument("RU000A105SK4", "ticker")
-    # print(f"{instr=}")
-    with br.get_client() as client:
-        try:
-            request = PostOrderRequest(
-                instrument_id="9b9a584e-448f-40da-9ba8-353b44ad697a",  # e022255e-fd8a-420a-bb13-ff7ddd10157c
-                quantity=10,
-                # price=price,
-                direction=OrderDirection.ORDER_DIRECTION_BUY,
-                account_id=ac.account_id,
-                order_type=OrderType.ORDER_TYPE_BESTPRICE,  # TODO: Добавить другие типы
-                # order_id=order_id
-            )
-            client.orders.post_order(request)
-
-        except RequestError as e:
-            print(f"Order failed: {e}")
-    pos = ac.get_positions()
-    print(pos)
