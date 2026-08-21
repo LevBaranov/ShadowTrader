@@ -1,15 +1,19 @@
 --extra-index-url https://opensource.tbank.ru/api/v4/projects/238/packages/pypi/simple
 
-t-tech-investments==1.49.2
+t-tech-investments==1.49.3
 pandas==2.3.2
 requests==2.32.5
 pydantic==2.11.7
 pydantic-settings==2.10.1
-toml==0.10.2
-aiogram==3.22.0
+httpx==0.28.1
 pytest==8.4.1
 pytest-mock==3.14.1
 requests-mock==1.12.1
 sqlalchemy==2.0.48
 alembic==1.18.4
 asyncpg==0.31.0
+fastapi[standard]==0.136.1
+python-jose==3.5.0
+passlib[argon2]==1.7.4
+cryptography==44.0.0
+aiosmtplib==5.1.2

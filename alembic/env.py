@@ -10,6 +10,10 @@ from alembic import context
 from src.db.database import Base, DATABASE_URL
 from src.db.models.task import Task, TaskResult
 from src.db.models.user import User
+from src.db.models.brokers_account import BrokersAccount
+from src.db.models.stock_market_index import StockMarketsIndex
+from src.db.models.users_broker import UsersBroker
+from src.db.models.users_strategy import UsersStrategy
 
 # this is the Alembic Config object, which provides
 # access to the values within the .ini file in use.

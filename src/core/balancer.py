@@ -1,10 +1,10 @@
 import pandas as pd
 from typing import List, Tuple, Dict
 
-from src.config import settings
-
+from src.models.balancer_params import BalancerParams
 from src.models.positions import Positions
 from src.models.index import Index
+from src.models.rebalance import CalculatedPosition
 
 
 class Balancer:
@@ -13,19 +13,23 @@ class Balancer:
 
     """
 
-    def __init__(self, positions: Positions, index: Index,
-                 delta: float = settings.balancer.delta,
-                 commission: float = settings.balancer.commission,
-                 min_lots_to_keep: float = settings.balancer.min_lots_to_keep,
-                 ):
+    def __init__(self, positions: Positions, index: Index, params: BalancerParams):
+        """
+        :param params: Параметры расчёта — настройки пользователя из БД
+            (комиссия с брокера, остальное со стратегии). Дефолтов у балансировщика
+            нет намеренно: расчёт не должен молча посчитаться «по общим» значениям.
+        """
         self.actions = []
         self.positions = positions
         self.index = index
         self.free_cash = positions.cash.to_float()
 
-        self.delta = delta
-        self.commission = commission
-        self.min_lots_to_keep = min_lots_to_keep
+        self.delta = float(params.delta)
+        self.commission = float(params.commission)
+        self.min_lots_to_keep = params.min_lots_to_keep
+        self.max_cash = float(params.max_cash)
+
+        self.calculated_positions: list[CalculatedPosition] = []
 
     def __calculate_portfolio_value(self, portfolio_dataframe: pd.DataFrame) -> float:
         """Общая стоимость портфеля с учетом свободных средств"""
@@ -123,6 +127,27 @@ class Balancer:
         # Продаём что исключили из индекса
         total_value = self.__calculate_portfolio_value(portfolio_df)
         rebalanced = self.create_weights_dataframe(index_df, portfolio_df, total_value)
+
+        self.calculated_positions = []
+        for ticker, row in rebalanced.iterrows():
+
+            balance = 0
+            if ticker in portfolio_df.index:
+                balance = int(
+                    portfolio_df.at[ticker, 'balance']
+                )
+
+            self.calculated_positions.append(
+                CalculatedPosition(
+                    ticker=ticker,
+                    target_weight=float(row['target_weight']),
+                    current_weight=float(row['current_weight']),
+                    balance=balance,
+                    lot_size=int(row['lot_size']),
+                    last_price=float(row['last_price']),
+                )
+            )
+
         exclude_positions = rebalanced[rebalanced['target_weight'] == 0]
         for ticker, position in exclude_positions.iterrows():
             self.add_action(
@@ -150,7 +175,8 @@ class Balancer:
                 lot_price = row['lot_size'] * row['last_price']
                 total_cost = lot_price * (1 + self.commission)
 
-                if total_cost < self.free_cash:
+                # Неснижаемый остаток max_cash на покупки не тратим.
+                if total_cost < self.free_cash - self.max_cash:
                     if ticker in portfolio_df.index:
                         portfolio_df.at[ticker, 'balance'] += row['lot_size']
                     else:

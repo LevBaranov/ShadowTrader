@@ -3,12 +3,13 @@ from typing import List, Tuple, Dict, Optional
 
 from src.core.balancer import Balancer
 
-from src.models.account import Account
+from src.models.balancer_params import BalancerParams
 from src.models.bond import MoexBond, Bond
 from src.models.positions import Positions
 from src.models.action import Action
 from src.models.error import Error
 from src.models.index import  Index
+from src.models.rebalance import RebalancePreview, PortfolioPosition
 
 from src.services.broker import TBroker, TAccount
 from src.services.stock_market import Moex
@@ -20,23 +21,26 @@ class PortfolioManager:
     рассчитывает что нужно сделать для балансировки
     """
 
-    def __init__(self, account_id: str = None):
+    def __init__(self, broker_token: str, account_id: str = None, sandbox: bool = None):
+        """
+        :param broker_token: Токен доступа к брокеру. Резолвится на сервисном слое из БД,
+            ядро не знает, откуда он взялся.
+        :param account_id: Идентификатор аккаунта пользователя в формате uuid.
+        :param sandbox: Режим песочницы. Если None — используется значение по умолчанию из TBroker.
+        """
         self.actions: List[Action] = []
-        self.broker = TBroker()
+
+        broker_kwargs = {"token": broker_token}
+        if sandbox is not None:
+            broker_kwargs["sandbox"] = sandbox
+        self.broker = TBroker(**broker_kwargs)
+
+        self.account_client: Optional[TAccount] = None
         if account_id:
             self.set_account(account_id)
-        else:
-            self.account_client: Optional[TAccount] = None
-        self._index_cache: Dict[Tuple[str, datetime.date], Index] = {}
-        self._indices_cache: Dict[datetime.date, List[Tuple[str, str]]] = {}
-        self.moex = Moex()
 
-    def get_user_accounts(self) -> List[Account]:
-        """
-        Получить список всех доступных пользователю аккаунтов
-        :return: Список аккаунтов
-        """
-        return self.broker.get_all_accounts()
+        self._index_cache: Dict[Tuple[str, datetime.date], Index] = {}
+        self.moex = Moex()
 
     def set_account(self, account_id: str) -> None:
         """
@@ -75,35 +79,6 @@ class PortfolioManager:
             self._index_cache[cache_key] = idx
         return self._index_cache[cache_key]
 
-    def get_indices_list(self) -> List[Tuple[str, str]]:
-        """
-        Получить список индексов, кешируя результат на день
-        :return: Список: Индекс, краткое название
-        """
-        today = datetime.date.today()
-        if today not in self._indices_cache:
-            idx = self.moex.get_indices()
-            self._indices_cache[today] = idx
-        return self._indices_cache[today]
-
-    def get_action_for_rebalance(self, portfolio: Positions, index: Index)-> Tuple[List[Action], float]:
-        """
-        Рассчитать список действий для балансировки и доступный свободный кэш
-        :param portfolio: Открытые позиции
-        :param index: Состав индекса
-        :return: Список действий для балансировки и прогнозируемый остаток средств после балансировки
-        """
-        self.actions = []
-
-        balancer = Balancer(portfolio, index)
-        actions_list, free_cash = balancer.calculate_actions()
-
-        for action in actions_list:
-            share = self.broker.find_share(action.get("ticker"), "ticker")
-            self.actions.append(Action(type=action.get("type"), quantity=action.get("quantity"), share=share))
-
-        return self.actions, free_cash
-
     def execute_actions(self) -> Tuple[List[Action], List[Error]]:
         """
         Выполнить накопленные действия по аккаунту
@@ -123,16 +98,17 @@ class PortfolioManager:
 
         return success_action_list, error_action_list
 
-    def get_callable_bonds(self, account_id: str = None) -> list[Bond]:
+    def get_bonds_with_events(self, account_id: str = None, since: datetime.date = None) -> list[Bond]:
         """
-        Возвращает список облигаций пользователя, по которым известна дата оферты.
+        Возвращает облигации на счёте, по которым впереди есть оферта или колл-опцион.
 
         * Получаем список всех облигаций у Мосбиржи.
-        * Оставляем только с датой оферты.
         * Получаем облигации на аккаунте брокера.
-        * Фильтруем облигации на аккаунте, оставляем только те, по которым известна дата оферты.
+        * Оставляем только те бумаги со счёта, у которых есть событие в будущем,
+          и прикладываем к каждой список этих событий с датами.
         :param account_id: Идентификатор аккаунта пользователя в формате uuid.
-        :return: Список облигаций.
+        :param since: С какой даты считать событие предстоящим (по умолчанию — сегодня).
+        :return: Список облигаций с предстоящими событиями.
         """
         if not self.account_client:
             if not account_id:
@@ -141,47 +117,112 @@ class PortfolioManager:
         elif account_id and self.account_client.account_id != account_id:
             self.set_account(account_id)
 
+        if since is None:
+            since = datetime.date.today()
+
         moex_bonds: list[MoexBond] = self.moex.get_bonds()
-        moex_bonds_by_tickers = { _moex_bond.ticker : _moex_bond for _moex_bond in moex_bonds if _moex_bond.offer_date }
+        moex_bonds_by_tickers = {_moex_bond.ticker: _moex_bond for _moex_bond in moex_bonds}
         portfolio_bonds = self.account_client.get_positions().bonds
 
-        callable_bonds = []
+        bonds_with_events = []
         for _portfolio_bond in portfolio_bonds:
-            if _portfolio_bond.ticker in moex_bonds_by_tickers.keys():
+            moex_bond = moex_bonds_by_tickers.get(_portfolio_bond.ticker)
+            if moex_bond is None:
+                continue
 
-                callable_bonds.append(
-                    Bond(
-                        uid=_portfolio_bond.uid,
-                        figi=_portfolio_bond.figi,
-                        ticker=_portfolio_bond.ticker,
-                        lot_size=_portfolio_bond.lot_size,
-                        type=_portfolio_bond.type,
-                        isin=None,
-                        offer_date=moex_bonds_by_tickers[_portfolio_bond.ticker].offer_date,
-                        call_option_date=moex_bonds_by_tickers[_portfolio_bond.ticker].call_option_date,
-                        put_option_date=moex_bonds_by_tickers[_portfolio_bond.ticker].put_option_date,
-                        buy_back_price=moex_bonds_by_tickers[_portfolio_bond.ticker].buy_back_price
-                    )
+            upcoming = sorted(
+                (event for event in moex_bond.events() if event.date >= since),
+                key=lambda event: event.date,
+            )
+            if not upcoming:
+                continue
+
+            bonds_with_events.append(
+                Bond(
+                    uid=_portfolio_bond.uid,
+                    figi=_portfolio_bond.figi,
+                    ticker=_portfolio_bond.ticker,
+                    lot_size=_portfolio_bond.lot_size,
+                    type=_portfolio_bond.type,
+                    isin=None,
+                    offer_date=moex_bond.offer_date,
+                    call_option_date=moex_bond.call_option_date,
+                    put_option_date=moex_bond.put_option_date,
+                    buy_back_price=moex_bond.buy_back_price,
+                    short_name=moex_bond.short_name,
+                    balance=_portfolio_bond.balance,
+                    events=upcoming,
                 )
+            )
 
-        return callable_bonds
+        return bonds_with_events
 
-if __name__ == "__main__":
-    import pprint
-    manager = PortfolioManager()
+    def calculate_rebalance(self, index_name: str, params: BalancerParams) -> RebalancePreview:
+        """
+        Метод для расчёта действий балансировки, кроме действий возвращает данные по весу внутри портфеля и индекса.
+        :param index_name: Наименование индекса для расчёта
+        :param params: Параметры расчёта — настройки брокера и стратегии.
+        :return: Действия, свободные средства и позиции с весом по каждой.
+        """
 
-    account = manager.get_user_accounts()[0]
+        portfolio = self.get_portfolio()
+        portfolio_items = { share.ticker: share for share in portfolio.shares }
 
-    # portfolio = manager.get_portfolio(account.id)
-    # pprint.pprint(portfolio)
-    # index_moex = manager.get_index_list("IMOEX")
-    #
-    # actions, cash = manager.get_action_for_rebalance(portfolio, index_moex)
-    # pprint.pprint(actions)
-    # pprint.pprint(cash)
+        index = self.get_index_list(index_name)
+        index_items = { item.ticker: item for item in index.items }
 
-    # success_action_list, error_action_list = manager.execute_actions()
-    # print(f"{success_action_list, error_action_list}")
+        self.actions = []
 
-    bonds = manager.get_callable_bonds(account.id)
-    pprint.pprint(bonds)
+        balancer = Balancer(portfolio, index, params)
+        actions_list, free_cash = balancer.calculate_actions()
+
+        offers = dict()
+        for action in actions_list:
+            share = self.broker.find_share(action.get("ticker"), "ticker")
+            self.actions.append(Action(type=action.get("type"), quantity=action.get("quantity"), share=share))
+
+            # Знак определяет направление сделки: покупка > 0, продажа < 0.
+            quantity = action.get("quantity")
+            offers[share.ticker] = -quantity if action.get("type") == "SELL" else quantity
+
+
+        positions = []
+
+        for position in balancer.calculated_positions:
+
+            portfolio_share = portfolio_items.get( position.ticker )
+
+            index_share = index_items.get( position.ticker )
+
+            uid = ""
+
+            if portfolio_share:
+                uid = portfolio_share.uid
+
+            elif index_share:
+                found_share = self.broker.find_share( position.ticker,"ticker" )
+
+                uid = found_share.uid
+
+            positions.append(
+                PortfolioPosition(
+                    uid=uid,
+                    ticker=position.ticker,
+                    name=(
+                        index_share.shortnames
+                        if index_share
+                        else position.ticker
+                    ),
+                    index_weight=round(position.target_weight * 100, 2),
+                    portfolio_weight=round(position.current_weight * 100, 2),
+                    portfolio_count=position.balance,
+                    offer=offers.get(position.ticker)
+                )
+            )
+
+        return RebalancePreview(
+            actions=self.actions,
+            current_free_cash=portfolio.cash.to_float() if portfolio.cash else 0.0,
+            free_cash=free_cash,
+            positions=positions
+        )

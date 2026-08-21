@@ -1,0 +1,8 @@
+__pycache__/
+*.pyc
+.dockerignore
+# Секреты в образ попадать не должны.
+.env
+.env-dev
+tests/
+.pytest_cache/

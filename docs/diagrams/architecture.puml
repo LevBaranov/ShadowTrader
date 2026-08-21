@@ -1,51 +1,96 @@
 @startuml
-!include https://raw.githubusercontent.com/plantuml-stdlib/C4-PlantUML/master/C4_Container.puml
+!include https://raw.githubusercontent.com/plantuml-stdlib/C4-PlantUML/master/C4_Component.puml
 
-title ShadowTrader
+title ShadowTrader — архитектура и пакеты бэкенда
 
-Person(user, "User", "Взаимодействует через Telegram-бот")
+' Одна схема на два уровня: снаружи — контейнеры и внешние системы, внутри
+' рамки бэкенда — пакеты src/ (api и scheduler собираются из одного образа и
+' делят этот пакет). Между пакетами направление стрелки = направление импорта,
+' циклов нет. Внешние вызовы (Moex, Tbank, SMTP, Telegram) идут из пакета
+' services — там живут все интеграции.
+
+Person(user, "Пользователь", "Управляет портфелем через веб-приложение или Telegram-бот")
 
 System_Boundary(app, "ShadowTrader") {
 
-    Container(main, "main", "Python module", "Точка входа в приложение")
+    Container(ui, "ui", "React, nginx", "Веб-приложение: стратегии, облигации, настройки")
 
-    Container(bot, "bot", "Container", "UI, тексты, обработчики, коллбеки и утилиты бота")
+    Container(bot, "bot", "Python, aiogram", "Telegram-бот. Отдельный образ и чистый клиент API: доступа к БД и коду бэкенда нет")
 
-    Container(core, "core", "Container", "Логика: PortfolioManager, Balancer, Scheduler")
+    Container_Boundary(backend, "api + scheduler — один образ, общий пакет src/") {
 
-    Container(services, "services", "Container", "Интеграции")
+        Component(api, "api", "FastAPI", "routes + dependencies.\nВесь домен наружу: пользователи, брокеры,\nстратегии, облигации, задачи.\nСобирает сервисы (composition root),\nмаппит доменные ошибки в HTTP")
 
-    Container(config, "config", "Container", "Загрузчик конфигурации")
+        Component(scheduler, "scheduler", "asyncio", "runner: задачи из таблицы task\n(автобалансировка, мониторинг облигаций),\nreports: тексты уведомлений")
 
-    Container(models, "models", "Container", "Сущности и объекты")
-    Container(db, "db", "Container", "Объекты для работы с БД")
+        Component(core, "core", "Python", "balancer, portfolio_manager,\n*_service: user, strategy, task, broker, bond,\nregistration, email_change, telegram_link,\ncrypto, verification")
+
+        Component(dbpkg, "db", "SQLAlchemy", "models — ORM-сущности,\nrepositories — доступ к данным,\nenums, database (сессия)")
+
+        Component(services, "services", "Python", "broker (Tbank), stock_market (Moex),\nemail (SMTP), notifications (Telegram/почта)")
+
+        Component(models, "models", "Pydantic", "api_* — DTO контракта API,\nдоменные объекты (positions, index, rebalance, bond),\nenum'ы.\nЛистовой пакет: ничего из src не импортирует")
+
+        Component(config, "config", "pydantic-settings", "Настройки из окружения")
+
+        Component(logging_setup, "logging_setup", "logging", "Логи приложения и интеграций")
+    }
+
+    ContainerDb(db, "db", "PostgreSQL", "Пользователи, способы входа, брокеры, стратегии, задачи")
 }
 
-' Внешние системы (облачка)
+' Внешние системы
 System_Ext(telegram, "Telegram", "Мессенджер")
-System_Ext(moex, "Moex", "Московская биржа")
+System_Ext(smtp, "SMTP", "Почта: коды подтверждения и уведомления")
+System_Ext(moex, "Moex", "Московская биржа: индексы и облигации")
 System_Ext(tbank, "Tbank", "Брокер")
 
-' Связи
+' Пользователь и клиенты
+Rel(user, ui, "Использует", "HTTPS")
 Rel(user, telegram, "Использует")
-Rel(main, telegram, "Отправляет сообщения / получает апдейты")
+Rel(telegram, bot, "Доставляет апдейты")
 
-Rel(main, bot, "Инициализирует")
-Rel(main, core, "Запускает задачу на расписание")
-Rel(main, config, "Загружает конфигурацию")
+Rel(ui, api, "REST API", "JSON/HTTPS")
+Rel(bot, api, "REST API: сервисный ключ → JWT", "JSON/HTTP")
 
-Rel(bot, core, "Передаёт команды")
-Rel(bot, config, "Читает настройки")
-Rel(bot, models, "Формирует модели")
+' Точки входа → домен и ниже (направление импорта)
+Rel_D(api, core, "Вызывает сервисы домена")
+Rel_D(api, dbpkg, "Создаёт сессию и репозитории")
+Rel_D(api, services, "Фабрики интеграций (Moex, TBroker)")
+Rel_D(api, models, "DTO запросов и ответов")
 
-Rel(core, services, "Использует для данных и заявок")
-Rel(core, config, "Читает настройки")
-Rel(core, models, "Формирует модели")
-Rel(core, db, "Получает объекты")
-Rel(config, models, "Формирует объекты конфигурации")
-Rel(config, db, "Формирует объекты конфигурации")
+Rel_D(scheduler, core, "portfolio_manager,\nbuild_portfolio_manager_for_account")
+Rel_D(scheduler, dbpkg, "TaskRepository и репозитории\nсущностей из params задачи")
+Rel_D(scheduler, services, "NotificationService")
 
-Rel(services, moex, "Запрашивает котировки")
-Rel(services, tbank, "Управляет позициями и заявками")
+' Домен → данные, интеграции, модели
+Rel_D(core, dbpkg, "ORM-сущности и репозитории")
+Rel_D(core, services, "Брокер, биржа, почта")
+Rel_D(core, models, "Доменные модели и DTO")
 
+' Данные и интеграции → модели
+Rel_D(dbpkg, models, "enum'ы и типы колонок")
+Rel_D(services, models, "Модели ответов интеграций")
+
+' Наружу из бэкенда
+Rel(dbpkg, db, "Читает и пишет")
+Rel(services, moex, "Индексы и облигации")
+Rel(services, tbank, "Позиции и заявки")
+Rel(services, smtp, "Коды подтверждения и уведомления")
+Rel(services, telegram, "Уведомления", "Bot API")
+
+' Чтобы не плодить стрелки от каждого пакета — общее правило.
+note right of logging_setup
+  config и logging_setup — инфраструктура:
+  их импортируют все пакеты выше
+  (config — api, core, db, services, scheduler;
+  logging_setup — api, services, scheduler).
+  Обратных зависимостей нет.
+end note
+
+Lay_R(dbpkg, services)
+Lay_R(models, config)
+Lay_R(config, logging_setup)
+
+SHOW_LEGEND()
 @enduml

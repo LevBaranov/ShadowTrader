@@ -74,7 +74,8 @@ class TestLoadIndexData:
 
     @staticmethod
     def load_test_data(filename):
-        with open(os.path.join("test_data", filename), "r") as f:
+        test_data_dir = os.path.join(os.path.dirname(__file__), "test_data")
+        with open(os.path.join(test_data_dir, filename), "r") as f:
             return json.load(f)
 
     @pytest.mark.parametrize("mock_response_data, expected", [
