@@ -190,3 +190,10 @@ docker build -f backend.Dockerfile -t shadowtrader-back .
 docker build -f bot.Dockerfile     -t shadowtrader-bot  ./bot
 docker build -f frontend.Dockerfile --target prod -t shadowtrader-ui .
 ```
+
+## Лицензия
+
+Исходный код распространяется по лицензии
+[PolyForm Noncommercial 1.0.0](LICENSE.md). Она разрешает использование,
+изменение и распространение кода только в некоммерческих целях. Для коммерческого
+использования требуется отдельное разрешение правообладателя.
