@@ -3,5 +3,7 @@
 aiogram==3.22.0
 httpx==0.28.1
 pydantic-settings==2.10.1
+# HTTP-сервер для режима webhook (BOT_RUN_MODE=webhook).
+aiohttp==3.11.*
 # Нужен, только если Telegram доступен через socks5-прокси (TELEGRAM_PROXY).
 aiohttp-socks==0.11.0

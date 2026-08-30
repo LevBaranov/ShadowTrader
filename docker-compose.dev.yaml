@@ -37,6 +37,8 @@ services:
     container_name: shadowtrader-bot-dev
     depends_on:
       - api
+    ports:
+      - "${WEBHOOK_PORT:-8080}:${WEBHOOK_PORT:-8080}"
     volumes:
       - ./bot:/app/bot
       - ./logs/bot:/app/logs
