@@ -10,7 +10,7 @@ import pytest
 from src.core.balancer import Balancer
 from src.models.balancer_params import BalancerParams
 from src.models.index import Index, IndexItem
-from src.models.positions import Positions, PositionsCash
+from src.models.positions import Cash, Positions, PositionsCash, PositionsInstrument
 
 
 def make_index(*items) -> Index:
@@ -127,3 +127,54 @@ class TestCommission:
 
         assert isinstance(free_cash, float)
         assert sum(buys(actions).values()) > 0
+
+
+class TestSellExcludedInLots:
+    """Исключённое из индекса продаётся лотами, а не штуками (кейс MSNG).
+
+    PostOrderRequest.quantity — лоты. Отправка balance в штуках превышает
+    позицию в lot_size раз: брокер видит шорт и отклоняет заявку
+    («Account margin status is disabled» при выключенной марже).
+    """
+
+    def msng_positions(self, balance: int) -> Positions:
+        """1000 шт. MSNG = 1 лот по ~1.34 ₽, денег нет — только продажа."""
+        return Positions(
+            cash=PositionsCash(units=0, nano=0, currency="rub"),
+            shares=[
+                PositionsInstrument(
+                    uid="uid-msng",
+                    figi="BBG000000000",
+                    balance=balance,
+                    last_price=Cash(units=1, nano=340_000_000),
+                    lot_size=1000,
+                    ticker="MSNG",
+                    type="share",
+                )
+            ],
+        )
+
+    @staticmethod
+    def sells(actions) -> dict[str, int]:
+        return {a["ticker"]: a["quantity"] for a in actions if a["type"] == "SELL"}
+
+    def test_excluded_sells_whole_lots(self, index):
+        actions, _ = Balancer(
+            self.msng_positions(1000), index, params()
+        ).calculate_actions()
+
+        assert self.sells(actions) == {"MSNG": 1}
+
+    def test_excluded_sells_floor_lots(self, index):
+        actions, _ = Balancer(
+            self.msng_positions(2500), index, params()
+        ).calculate_actions()
+
+        assert self.sells(actions) == {"MSNG": 2}
+
+    def test_excluded_less_than_lot_sells_nothing(self, index):
+        actions, _ = Balancer(
+            self.msng_positions(500), index, params()
+        ).calculate_actions()
+
+        assert self.sells(actions) == {}
