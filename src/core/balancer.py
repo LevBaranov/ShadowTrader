@@ -150,11 +150,22 @@ class Balancer:
 
         exclude_positions = rebalanced[rebalanced['target_weight'] == 0]
         for ticker, position in exclude_positions.iterrows():
-            self.add_action(
-                "SELL",
-                ticker,
-                int(portfolio_df.at[ticker, 'balance'])
-            )
+            if ticker not in portfolio_df.index:
+                continue
+            # PostOrderRequest.quantity — лоты, а balance — штуки.
+            # Продажа "штук как лотов" превышает позицию и отклоняется
+            # брокером (шорт при выключенной марже).
+            balance = int(portfolio_df.at[ticker, 'balance'])
+            lot_size = int(position['lot_size'])
+            if lot_size <= 0:
+                continue
+            lots_to_sell = balance // lot_size
+            if lots_to_sell > 0:
+                self.add_action(
+                    "SELL",
+                    ticker,
+                    lots_to_sell
+                )
 
         portfolio_df.drop(exclude_positions.index, inplace=True)
 
