@@ -30,17 +30,30 @@ class FakeBrokerRepo:
         self.brokers = {}
         self.upserted = None
 
+    async def get_by_user_and_name(self, user_id, broker_name):
+        for broker in self.brokers.values():
+            if broker.user_id == user_id and broker.broker_name == broker_name:
+                return broker
+        return None
+
     async def upsert(self, user_id, broker_name, encrypted_token, sandbox, commission=None):
-        broker = SimpleNamespace(
-            id=uuid.uuid4(),
-            user_id=user_id,
-            broker_name=broker_name,
-            broker_token=encrypted_token,
-            sandbox=sandbox,
-            commission=commission if commission is not None else Decimal("0.003"),
-        )
+        broker = await self.get_by_user_and_name(user_id, broker_name)
+        if broker is None:
+            broker = SimpleNamespace(
+                id=uuid.uuid4(),
+                user_id=user_id,
+                broker_name=broker_name,
+                broker_token=encrypted_token,
+                sandbox=sandbox,
+                commission=Decimal("0.003"),
+            )
+            self.brokers[broker.id] = broker
+        else:
+            broker.broker_token = encrypted_token
+            broker.sandbox = sandbox
+        if commission is not None:
+            broker.commission = commission
         self.upserted = commission
-        self.brokers[broker.id] = broker
         return broker
 
     async def update_commission(self, broker_id, user_id, commission):
@@ -138,6 +151,45 @@ class TestBrokerCommission:
             asyncio.run(
                 broker_service.update_commission(user, broker.id, Decimal("1.5"))
             )
+
+
+class TestBrokerSandboxMode:
+
+    def _save(self, service, user, sandbox=None):
+        return asyncio.run(
+            service.save_broker_settings(
+                user=user,
+                broker_name=BrokerNames.T_BANK,
+                token="t.token",
+                sandbox=sandbox,
+                commission=None,
+            )
+        )
+
+    def test_new_broker_defaults_to_live(self, broker_service, user):
+        broker = self._save(broker_service, user)
+
+        assert broker.sandbox is False
+
+    def test_new_broker_sandbox_when_requested(self, broker_service, user):
+        broker = self._save(broker_service, user, sandbox=True)
+
+        assert broker.sandbox is True
+
+    def test_token_update_keeps_sandbox(self, broker_service, user):
+        """Обновление токена песочного брокера без флага не превращает его в боевой."""
+        self._save(broker_service, user, sandbox=True)
+
+        broker = self._save(broker_service, user)
+
+        assert broker.sandbox is True
+
+    def test_explicit_mode_switch(self, broker_service, user):
+        self._save(broker_service, user, sandbox=True)
+
+        broker = self._save(broker_service, user, sandbox=False)
+
+        assert broker.sandbox is False
 
 
 class FakeStrategyRepo:

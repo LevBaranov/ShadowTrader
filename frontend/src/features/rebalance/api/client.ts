@@ -1,5 +1,6 @@
 import api from "../../../shared/api/client";
 import type { CurrentUserInfo } from "../types/user";
+import type { Action } from "../types/rebalance";
 import type {
   BrokerAccount,
   StockMarketIndex,
@@ -42,21 +43,38 @@ type RebalanceApiResult = {
 };
 
 export const executeRebalance = async (
-  strategyId: string
+  strategyId: string,
+  actions: Action[]
 ): Promise<RebalanceExecutionResult> => {
+  // Отсекаем мусор до POST: сервер отверг бы его 422 (quantity — лоты > 0).
+  const planned = actions
+    .filter((a) => Number.isInteger(a.quantity) && a.quantity > 0)
+    .map((a) => ({
+      type: a.type,
+      ticker: a.ticker,
+      quantity: a.quantity,
+    }));
   const res = await api.post<RebalanceApiResult>("/portfolios/balance", {
     strategyId,
+    // Исполняем ровно показанное: непустой план сервер пересчитывать не будет.
+    // Пустой список сервер трактует как отсутствие плана (пересчёт сам).
+    actions: planned,
   });
 
-  const { success = [], errors = [] } = res.data ?? {};
+  if (!res.data) {
+    throw new Error("Пустой ответ сервера на балансировку");
+  }
+  const { success = [], errors = [] } = res.data;
+
+  const actionDone = (type: string) =>
+    type === "SELL" ? "Продано" : type === "BUY" ? "Куплено" : `Исполнено (${type})`;
 
   return {
     success: success.map(
-      (a) =>
-        `${a.type === "SELL" ? "Продано" : "Куплено"} ${a.ticker ?? "?"} (${a.quantity} шт)`
+      (a) => `${actionDone(a.type)} ${a.ticker ?? "?"} (${a.quantity} шт)`
     ),
     errors: errors.map((e) => {
-      const action = e.type === "SELL" ? "продать" : "купить";
+      const action = e.type === "SELL" ? "продать" : e.type === "BUY" ? "купить" : "исполнить";
       const target = e.ticker
         ? ` ${e.ticker}${e.quantity ? ` (${e.quantity} шт)` : ""}`
         : "";

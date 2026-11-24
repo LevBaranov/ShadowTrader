@@ -5,7 +5,8 @@ from src.models.api_base import BaseApiModel
 
 class TaskResponse(BaseApiModel):
     id: str
-    # Имена enum'ов (BOND_EVENTS_MONITOR, REBALANCE; WEEKLY, MONTHLY, QUARTERLY).
+    # Имена enum'ов (BOND_EVENTS_MONITOR, REBALANCE; WEEKLY, MONTHLY, QUARTERLY;
+    # DAILY и INDEX_SYNC — только системная задача синка составов).
     type: str
     frequency: str
     params: dict | None = None

@@ -1,10 +1,10 @@
 import requests
+from datetime import date
 
 from src.config import stock_market_settings
 from src.logging_setup import integration_call
 
-from src.models.index import Index, IndexItem
-from src.models.bond import MoexBond
+from src.models.bond import MoexBond, parse_moex_date
 from src.models.error import Error
 
 
@@ -34,10 +34,12 @@ class Moex:
                 response = self.session.get(url, params=params)
                 response.raise_for_status()
             except requests.RequestException as e:
+                # При ConnectionError/таймауте response нет — не маскируем исходную ошибку.
+                status_code = getattr(e.response, "status_code", None)
                 raise Error(source="Moex",
                             source_data=e,
                             data={"url": url, "params": params},
-                            description=f"Code: {e.response.status_code}")
+                            description=f"Code: {status_code}")
 
             data = response.json()
             call.add(status=response.status_code)
@@ -45,68 +47,37 @@ class Moex:
 
             return data
 
-    def _load_index_data(self, index_name: str) -> list:
+    def load_index_rows(self, index_name: str) -> list:
+        """Сырые строки analytics состава индекса с Мосбиржи.
+
+        Строка — [indexid, tradedate, ticker, shortnames, weight].
+        Пустой список означает «состава нет» — вызывающий решает сам
+        (IndexSyncService трактует как ошибку, старые строки не трогает).
+        """
         url = f"{self.base_url}/statistics/engines/stock/markets/index/analytics/{index_name}.json"
-        params = {
-            "limit": self.limit,
-            "start": 0,
-            "analytics.columns": "indexid,tradedate,ticker,shortnames,weight",
-        }
-        data = self._fetch_json(url, params, operation="index_analytics")
-        return data.get("analytics", {}).get("data", [])
-
-    def _load_market_data(self, index_name: str) -> tuple[list, list]:
-        url = f"{self.base_url}/engines/stock/markets/shares/boards/TQBR/securities.json?index={index_name}"
-        params = {
-            "limit": self.limit,
-            "start": 0,
-            "marketdata.columns": "SECID,LAST",
-            "securities.columns": "SECID,LOTSIZE,ISIN"
-        }
-        data = self._fetch_json(url, params, operation="index_market_data")
-        market = data.get("marketdata", {}).get("data", [])
-        sec = data.get("securities", {}).get("data", [])
-        return sec, market
-
-    def get_index_list(self, index_name: str) -> Index:
-        """
-        Получаем информацию о наполнении индекса
-        :param index_name: Наименование индекса
-        :return: Данные индекса
-        """
-
-        def get_key(array_row, array_type):
-            """
-            Возвращает позицию ключа "тикера" для типа массива
-            :param array_row: Строка массива
-            :param array_type: Тип массива
-            :return:
-            """
-            if array_type == "analytics":
-                return array_row[2]
-            return array_row[0]
-
-        index_name = index_name.upper()
-
-        analytics = self._load_index_data(index_name)
-        securities, marketdata = self._load_market_data(index_name)
-        date = analytics[0][1] if analytics else ""
-
-        index_by_tickers = {}
-        for array_type, array in [("analytics", analytics), ("securities", securities), ("marketdata", marketdata)]:
-            for row in array:
-                key = get_key(row, array_type)
-                if key not in index_by_tickers:
-                    index_by_tickers[key] = []
-                index_by_tickers[key].extend(row[1:] if array_type != "analytics" else row)
-
-
-        index = Index(name=index_name, date=date)
-        for t, val in index_by_tickers.items():
-            item = IndexItem(*val[2:])
-            index.items.append(item)
-
-        return index
+        rows: list = []
+        first_row = None
+        start = 0
+        while True:
+            params = {
+                "limit": self.limit,
+                "start": start,
+                "analytics.columns": "indexid,tradedate,ticker,shortnames,weight",
+            }
+            data = self._fetch_json(url, params, operation="index_analytics")
+            page = data.get("analytics", {}).get("data", [])
+            if not page:
+                break
+            # Защита от сервера, игнорирующего start: иначе цикл бесконечный.
+            if first_row is None:
+                first_row = page[0]
+            elif page[0] == first_row:
+                break
+            rows.extend(page)
+            if len(page) < self.limit:
+                break
+            start += len(page)
+        return rows
 
     def get_indices(self) -> list[tuple[str, str]]:
         """
@@ -129,6 +100,17 @@ class Moex:
 
         return result
 
+    # Режимы торгов, которые считаем основными: одна бумага торгуется на
+    # нескольких досках, а в справочнике нужен один ряд на secid.
+    _PREFERRED_BOND_BOARDS = ("TQCB", "TQOB", "TQIR", "TQTF", "TQBD")
+
+    @classmethod
+    def _board_rank(cls, board_name: str) -> int:
+        try:
+            return cls._PREFERRED_BOND_BOARDS.index(board_name)
+        except ValueError:
+            return len(cls._PREFERRED_BOND_BOARDS)
+
     def get_bonds(self) -> list[MoexBond]:
         """
         Возвращает список облигаций с Мосбиржи
@@ -136,13 +118,89 @@ class Moex:
         """
 
         url = f"{self.base_url}/engines/stock/markets/bonds/securities.json"
-        params = {
-            # "limit": self.limit,
-            "start": 0,
-            "securities.columns":
-                "SECID,SHORTNAME,BOARDNAME,LOTVALUE,OFFERDATE,CALLOPTIONDATE,PUTOPTIONDATE,BUYBACKPRICE",
-        }
-        data = self._fetch_json(url, params, operation="get_bonds")
-        result = [ MoexBond(*sec) for sec in data.get("securities", {}).get("data", [])]
+        columns = (
+            "SECID,SHORTNAME,BOARDNAME,LOTVALUE,OFFERDATE,"
+            "CALLOPTIONDATE,PUTOPTIONDATE,BUYBACKPRICE,ISIN"
+        )
+        by_secid: dict[str, MoexBond] = {}
+        first_row = None
+        start = 0
+        while True:
+            data = self._fetch_json(
+                url,
+                {
+                    "limit": self.limit,
+                    "start": start,
+                    "securities.columns": columns,
+                },
+                operation="get_bonds",
+            )
+            page = data.get("securities", {}).get("data", [])
+            if not page:
+                break
+            # Защита от сервера, игнорирующего start: иначе цикл бесконечный.
+            if first_row is None:
+                first_row = page[0]
+            elif page[0] == first_row:
+                break
+            for sec in page:
+                bond = MoexBond(*sec)
+                current = by_secid.get(bond.ticker)
+                if (
+                    current is None
+                    or self._board_rank(bond.board_name)
+                    < self._board_rank(current.board_name)
+                ):
+                    by_secid[bond.ticker] = bond
+            if len(page) < self.limit:
+                break
+            start += len(page)
 
-        return result
+        return list(by_secid.values())
+
+    def get_bond_offers(self, from_date: date) -> list[tuple[str, str | None, date]]:
+        """Оферты по облигациям из bondization: (secid, isin, дата начала подачи заявок).
+
+        Блок offers отдаёт окна оферт: offerdate — дата самой оферты,
+        offerdatestart — когда можно начать подавать заявку. Отдаём только
+        оферты, ещё не прошедшие (from_date). Пагинация по offers.start.
+        """
+        url = f"{self.base_url}/statistics/engines/stock/markets/bonds/bondization.json"
+        offers: list[tuple[str, str | None, date]] = []
+        start = 0
+        while True:
+            params = {
+                "from": from_date.isoformat(),
+                "offers.limit": 100,
+                "offers.start": start,
+            }
+            data = self._fetch_json(url, params, operation="get_bond_offers")
+            block = data.get("offers") or {}
+            columns = block.get("columns", [])
+            rows = block.get("data", [])
+            if not rows:
+                break
+
+            try:
+                i_secid = columns.index("secid")
+                i_isin = columns.index("isin")
+                i_start = columns.index("offerdatestart")
+            except ValueError as e:
+                raise Error(source="Moex",
+                            source_data=e,
+                            data={"url": url, "columns": columns},
+                            description="offers block missing expected columns")
+
+            for row in rows:
+                start_date = parse_moex_date(row[i_start])
+                secid = row[i_secid]
+                if start_date is None or not secid:
+                    # Окно подачи не открыто/не задано — уведомлять не о чем.
+                    continue
+                offers.append((secid, row[i_isin] or None, start_date))
+
+            if len(rows) < 100:
+                break
+            start += len(rows)
+
+        return offers

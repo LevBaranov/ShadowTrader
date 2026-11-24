@@ -4,7 +4,7 @@ from typing import List
 from pydantic import EmailStr, Field
 
 from src.models.api_base import BaseApiModel
-from src.models.rebalance import PortfolioPosition
+from src.models.rebalance import PlannedAction, PortfolioPosition
 
 class BaseInfo(BaseApiModel):
     id: str
@@ -51,6 +51,8 @@ class UserStrategy(BaseApiModel):
     settings: StrategySettings
     # Счёт стратегии помечен удалённым у брокера — балансировка недоступна.
     account_deleted: bool = False
+    # Торговая дата, за которую взят состав индекса. None — счёт недоступен.
+    index_date: str | None = None
 
 class CurrentUserInfo(BaseApiModel):
     id: str
@@ -62,6 +64,9 @@ class CurrentUserInfo(BaseApiModel):
 
 class RebalanceRequest(BaseApiModel):
     strategy_id: str
+    # Готовый план клиента: исполнить как есть, без пересчёта.
+    # Пустой список — валидный no-op.
+    actions: List[PlannedAction]
 
 
 class LoginRequest(BaseApiModel):

@@ -3,6 +3,11 @@
 Соглашение по params:
 - BOND_EVENTS_MONITOR: {"brokers_account_id": "<uuid brokers_account.id>"}
 - REBALANCE: {"strategy_id": "<uuid users_strategy.id>", "min_free_cash": <int>}
+- INDEX_SYNC: системная задача без владельца, через API не создаётся.
+- MOEX_BONDS_OFFER_DATE_SYNC: системная задача без владельца — сверяет
+  bondization со справочником и создаёт пользователям разовые задачи
+  NOTIFY_START_OFFER_DATE {"brokers_account_id": "<uuid>"}; они скрыты от
+  пользователей: планировщик шлёт по ним уведомление и завершает задачу.
 
 min_free_cash — настройка планировщика: порог свободного кэша, ниже которого
 автобалансировка не запускается (раньше был общим для всех в toml —
@@ -22,6 +27,15 @@ from src.models.scheduler_frequency import ScheduleFrequency
 TASK_REQUIRED_PARAM = {
     TaskType.BOND_EVENTS_MONITOR: "brokers_account_id",
     TaskType.REBALANCE: "strategy_id",
+}
+
+# Системные задачи создаёт сам планировщик/бэкенд, пользователям они
+# недоступны: ни создать, ни увидеть, ни отменить.
+SYSTEM_TASK_TYPES = {
+    TaskType.INDEX_SYNC,
+    TaskType.MOEX_BONDS_SYNC,
+    TaskType.MOEX_BONDS_OFFER_DATE_SYNC,
+    TaskType.NOTIFY_START_OFFER_DATE,
 }
 
 # Порог по умолчанию для новой задачи автобалансировки: значение прежнего
@@ -46,13 +60,17 @@ class TaskService:
         self.task_repo = task_repo
 
     async def list_tasks(self, user) -> list[Task]:
-        return await self.task_repo.get_user_tasks(user.id)
+        tasks = await self.task_repo.get_user_tasks(user.id)
+        return [task for task in tasks if task.task_type not in SYSTEM_TASK_TYPES]
 
     async def create_task(self, user, task_type: str, frequency: str, params: dict | None) -> Task:
         try:
             task_type_enum = TaskType[task_type]
         except KeyError:
             raise TaskValidationError(f"Unknown task type: {task_type}")
+
+        if task_type_enum in SYSTEM_TASK_TYPES:
+            raise TaskValidationError(f"{task_type} is a system task")
 
         try:
             frequency_enum = ScheduleFrequency[frequency]
@@ -97,6 +115,7 @@ class TaskService:
         другая задача, её создают заново.
         """
         task = await self._get_own_active_task(user, task_id)
+        self._reject_system_task(task)
 
         new_frequency = None
         if frequency is not None:
@@ -121,7 +140,8 @@ class TaskService:
         )
 
     async def disable_task(self, user, task_id: uuid.UUID) -> None:
-        await self._get_own_active_task(user, task_id)
+        task = await self._get_own_active_task(user, task_id)
+        self._reject_system_task(task)
 
         await self.task_repo.disable_task(task_id)
 
@@ -132,6 +152,12 @@ class TaskService:
             raise TaskNotFoundError(str(task_id))
 
         return task
+
+    @staticmethod
+    def _reject_system_task(task: Task) -> None:
+        """Системные задачи пользователю не отдаём даже по id (как будто нет)."""
+        if task.task_type in SYSTEM_TASK_TYPES:
+            raise TaskNotFoundError(str(task.id))
 
 
 def _parse_min_free_cash(value) -> int:

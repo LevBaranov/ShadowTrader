@@ -35,6 +35,17 @@ def utcnow() -> datetime:
     return datetime.now(timezone.utc).replace(tzinfo=None)
 
 
+def as_naive_utc(moment: datetime) -> datetime:
+    """Привести datetime к наивному UTC, как хранится в БД.
+
+    Даты от клиентов (JSON) часто приходят offset-aware ("...Z", "+03:00"),
+    а сравнение aware с наивным падает TypeError — нормализуем на входе.
+    """
+    if moment.tzinfo is not None:
+        return moment.astimezone(timezone.utc).replace(tzinfo=None)
+    return moment
+
+
 def hash_code(code: str) -> str:
     # Для 6-значного кода с TTL и лимитом попыток достаточно быстрого хеша.
     return hashlib.sha256(code.encode()).hexdigest()

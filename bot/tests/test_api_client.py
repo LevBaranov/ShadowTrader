@@ -52,6 +52,9 @@ class FakeBackend:
         if request.url.path.startswith("/tasks/") and request.method == "DELETE":
             return httpx.Response(204)
 
+        if request.url.path == "/portfolios/balance" and request.method == "POST":
+            return httpx.Response(200, json={"success": [], "errors": []})
+
         if request.url.path.startswith("/brokers/") and request.method == "PATCH":
             body = json.loads(request.content)
             return httpx.Response(200, json={
@@ -152,3 +155,20 @@ def test_update_broker_sends_commission_as_fraction(api, backend):
     patch_request = [r for r in backend.requests
                      if r.method == "PATCH" and r.url.path == "/brokers/broker-1"][0]
     assert json.loads(patch_request.content) == {"commission": "0.003"}
+
+
+def test_execute_sends_planned_actions(api, backend):
+    actions = [{"type": "BUY", "ticker": "SBER", "quantity": 2}]
+
+    result = asyncio.run(api.execute_rebalance(TELEGRAM_ID, "s-1", actions))
+
+    assert result == {"success": [], "errors": []}
+    request = [r for r in backend.requests if r.url.path == "/portfolios/balance"][0]
+    assert json.loads(request.content) == {"strategyId": "s-1", "actions": actions}
+
+
+def test_execute_without_actions_keeps_legacy_body(api, backend):
+    asyncio.run(api.execute_rebalance(TELEGRAM_ID, "s-1"))
+
+    request = [r for r in backend.requests if r.url.path == "/portfolios/balance"][0]
+    assert json.loads(request.content) == {"strategyId": "s-1"}

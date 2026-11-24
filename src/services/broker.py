@@ -11,6 +11,7 @@ from t_tech.invest.grpc import PositionsRequest, GetLastPricesRequest, PostOrder
 from t_tech.invest.constants import INVEST_GRPC_API_SANDBOX
 
 from src.models.instrument import InstrumentBase
+from src.models.instrument_directory import InstrumentDirectory, InstrumentMeta
 
 from src.logging_setup import integration_call
 
@@ -33,6 +34,17 @@ class BrokerAccountNotFoundError(Exception):
 SERVICE = "broker"
 
 
+def _lookup_directory(
+    directory: InstrumentDirectory, field: str, value: str
+) -> InstrumentMeta | None:
+    """Найти мету в снимке справочника. Неизвестное поле — промах без сети."""
+    if field == "ticker":
+        return directory.by_ticker.get(value)
+    if field == "uid":
+        return directory.by_uid.get(value)
+    return None
+
+
 class TBroker:
     """
     Класс брокера Т-Банка. Будем получать информацию об аккаунтах
@@ -43,6 +55,7 @@ class TBroker:
         self.target = INVEST_GRPC_API_SANDBOX if sandbox else None
         self._shares_by_uid: Dict[str, Share] = {}
         self._shares_by_ticker: Dict[str, Share] = {}
+        self._shares_refreshed = False
         self._instruments_by_uid: Dict[str, InstrumentBase] = {}
         self._instruments_by_ticker: Dict[str, InstrumentBase] = {}
 
@@ -74,6 +87,36 @@ class TBroker:
 
             return result
 
+    def get_last_prices_by_uid(self, instrument_uids: list) -> Dict[str, float]:
+        """
+        Возвращает последние цены инструментов у брокера одним батчем.
+        :param instrument_uids: Список uid инструментов.
+        :return: Словарь {uid: цена}. По инструментам без цены записи нет.
+        """
+        uids = list(dict.fromkeys(instrument_uids))
+        if not uids:
+            return {}
+
+        with integration_call(SERVICE, "get_last_prices", count=len(uids)) as call:
+            try:
+                with self.get_client() as client:
+                    response = client.market_data.get_last_prices(
+                        GetLastPricesRequest(instrument_id=uids)
+                    )
+            except RequestError as error:
+                raise Error(
+                    source="Broker", source_data=error, data={"uids": uids},
+                    description=getattr(error.metadata, "message", str(error)),
+                ) from error
+
+            prices = {}
+            for last_price in response.last_prices:
+                quotation = last_price.price
+                prices[last_price.instrument_uid] = quotation.units + quotation.nano / 1e9
+
+            call.add(found=len(prices))
+            return prices
+
     def get_all_shares(self) -> ShareList:
         """
         Возвращает список акций с их дополнительной информацией.
@@ -93,38 +136,71 @@ class TBroker:
             call.add(count=len(shares))
             call.detail(tickers=[share.ticker for share in shares])
 
+            self._shares_refreshed = True
             return ShareList(shares)
 
-    def find_share(self, value: str, field: str = "uid") -> Optional[Share]:
+    def _cached_share(self, value: str, field: str) -> Optional[Share]:
+        """Акция из локального кэша без сети."""
+        lookup_maps = {
+            "ticker": self._shares_by_ticker,
+            "uid": self._shares_by_uid,
+        }
+        return lookup_maps.get(field, {}).get(value)
+
+    def find_share(
+        self, value: str, field: str = "uid",
+        directory: InstrumentDirectory | None = None,
+    ) -> Optional[Share]:
         """
         Метод для поиска информации об акции. Может принимать на вход uid или ticker
         :param value: Значение, по которому осуществляется поиск.
         :param field: Тип значения, по которому ищем. Допустимые значения: uid, ticker.
+        :param directory: Снимок справочника из БД — сначала ищем в нём, без сети.
+            Промах — живой вызов как раньше (аварийный путь).
         :return: Share. Информация об акции
         """
-        lookup_maps = {
-            "ticker": self._shares_by_ticker,
-            "uid": self._shares_by_uid
-        }
-        result = lookup_maps.get(field, {}).get(value)
-        if not result:
+        if directory is not None:
+            meta = _lookup_directory(directory, field, value)
+            if meta is not None:
+                # В справочнике есть, но это не акция — дальше искать нечего.
+                return (
+                    Share(meta.uid, meta.figi, meta.ticker, meta.lot_size, meta.isin, "share")
+                    if meta.type == "share"
+                    else None
+                )
+            # Справочник авторитетен: промах не повод идти в сеть.
+            return self._cached_share(value, field)
+
+        result = self._cached_share(value, field)
+        if result is None and not self._shares_refreshed:
+            # Аварийный путь без справочника: полный список грузим один раз.
             self.get_all_shares()
-            # пересоздаём lookup_maps, так как словари могли обновиться
-            lookup_maps = {
-                "ticker": self._shares_by_ticker,
-                "uid": self._shares_by_uid
-            }
-            result = lookup_maps.get(field, {}).get(value)
+            result = self._cached_share(value, field)
 
         return result
 
-    def find_instrument(self, value: str, field: str = "uid") -> Optional[InstrumentBase]:
+    def find_instrument(
+        self, value: str, field: str = "uid",
+        directory: InstrumentDirectory | None = None,
+        refresh: bool = True,
+    ) -> Optional[InstrumentBase]:
         """
-        Метод для поиска информации об облигациях. Может принимать на вход uid или ticker
+        Метод для поиска информации об инструменте (акция/облигация).
+        Может принимать на вход uid или ticker
         :param value: Значение, по которому осуществляется поиск.
         :param field: Тип значения, по которому ищем. Допустимые значения: uid, ticker.
-        :return: Bond. Информация об облигации
+        :param directory: Снимок справочника из БД — сначала ищем в нём, без сети.
+        :param refresh: Разрешено ли подгружать полный список инструментов,
+            если инструмента нет в кэше. False — ищем только в кэше, без сети.
+        :return: InstrumentBase. Информация об инструменте
         """
+        if directory is not None:
+            meta = _lookup_directory(directory, field, value)
+            if meta is not None:
+                return InstrumentBase(
+                    meta.uid, meta.figi, meta.ticker, meta.lot_size, meta.isin, meta.type
+                )
+
         def _find(_value: str, _field: str = "uid"):
 
             lookup_maps = {
@@ -134,12 +210,17 @@ class TBroker:
             return lookup_maps.get(_field, {}).get(_value)
 
         result = _find(value, field)
-        if not result:
+        if not result and refresh:
             self.get_all_instruments()
             # пересоздаём lookup_maps, так как словари могли обновиться
             result = _find(value, field)
 
         return result
+
+    def get_cached_instrument(self, uid: str) -> Optional[InstrumentBase]:
+        """Инструмент из кэша брокера по uid — без сети."""
+        cached = self._instruments_by_uid.get(uid)
+        return cached if isinstance(cached, InstrumentBase) else None
 
     def get_all_instruments(self) -> list[InstrumentBase]:
         """
@@ -185,11 +266,29 @@ class TAccount:
         self.account_id = account_id
         self.broker = broker
 
-    def get_positions(self)-> Positions:
+    def _resolve_instrument(
+        self, uid: str, directory: InstrumentDirectory | None
+    ) -> Optional[InstrumentBase]:
+        """Метаданные uid без сети: снимок справочника, затем кэш брокера."""
+        if directory is not None:
+            meta = _lookup_directory(directory, "uid", uid)
+            if meta is not None:
+                return InstrumentBase(
+                    meta.uid, meta.figi, meta.ticker, meta.lot_size, meta.isin, meta.type
+                )
+        instrument = self.broker.get_cached_instrument(uid)
+        return instrument if isinstance(instrument, InstrumentBase) else None
+
+    def get_positions(self, directory: InstrumentDirectory | None = None) -> Positions:
         """
         Возвращает позиции на счете.
+        :param directory: Снимок справочника инструментов — held-бумаги резолвятся
+            по uid без сети. None — живой поиск как раньше (аварийный путь).
         """
-        def create_position_instrument(_i:InstrumentBase, _b:int, _last_price) -> PositionsInstrument:
+        def create_position_instrument(_i:InstrumentBase, _b:int, _last_price) -> PositionsInstrument | None:
+            # Цены может не быть (нет торгов) — такую позицию пропускаем.
+            if _last_price is None:
+                return None
 
             return PositionsInstrument(
                             uid=_i.uid,
@@ -219,17 +318,42 @@ class TAccount:
                     return Positions(cash=PositionsCash(**asdict(positions.money[0])) if positions.money else None,
                                      shares=[])
 
-                # Матчим акции и баланс
-                instrument_uids = []
+                # Сопоставляем акции и баланс. Промахи разрешаем пакетно: одно
+                # обновление справочника брокера на все позиции вместо вызова на каждую.
                 instrument_balance = []
-                for _position in positions.securities:
-                    if _position.instrument_type in ["share", "bond"]:
-                        instrument_uids.append(_position.instrument_uid)
-                        instrument = self.broker.find_instrument(_position.instrument_uid)
 
-                        # TODO: Возможно логика лишняя и требует удаления
-                        if instrument:  # Проблема с BBG007N0Z367. Его нет в списке всех акций, но в портфеле он остался, хоть и продан
-                            instrument_balance.append((instrument, _position.balance))
+                unresolved = [
+                    _position for _position in positions.securities
+                    if _position.instrument_type in ["share", "bond"]
+                    and self._resolve_instrument(_position.instrument_uid, directory) is None
+                ]
+                # Одно живое обновление справочника на все промахи. Бумаги, которых
+                # нет даже в полном списке брокера (закрытые/выкупленные), после
+                # этого больше НЕ обновляют справочник повторно — просто пропускаются.
+                refreshed = False
+                if unresolved:
+                    self.broker.get_all_instruments()
+                    refreshed = True
+
+                for _position in positions.securities:
+                    if _position.instrument_type not in ["share", "bond"]:
+                        continue
+                    instrument = self._resolve_instrument(
+                        _position.instrument_uid, directory
+                    )
+                    if instrument is None:
+                        # Промах после пакетного обновления — единичный поиск
+                        # без повторного обновления (find_instrument с refresh=False).
+                        instrument = self.broker.find_instrument(
+                            _position.instrument_uid,
+                            "uid",
+                            directory=None,
+                            refresh=not refreshed,
+                        )
+
+                    # TODO: Возможно логика лишняя и требует удаления
+                    if instrument:  # Проблема с BBG007N0Z367. Его нет в списке всех акций, но в портфеле он остался, хоть и продан
+                        instrument_balance.append((instrument, _position.balance))
 
                 # Получаем информацию о последних ценах
                 last_prices = {
@@ -242,14 +366,15 @@ class TAccount:
                 shares_positions = []
                 bonds_positions = []
                 for _instrument, _balance in instrument_balance:
+                    position_instrument = create_position_instrument(
+                        _instrument, _balance, last_prices.get(_instrument.uid)
+                    )
+                    if position_instrument is None:
+                        continue
                     if _instrument.type == "share":
-                        shares_positions.append(
-                            create_position_instrument(_instrument, _balance, last_prices.get(_instrument.uid))
-                        )
+                        shares_positions.append(position_instrument)
                     if _instrument.type == "bond":
-                        bonds_positions.append(
-                            create_position_instrument(_instrument, _balance, last_prices.get(_instrument.uid))
-                        )
+                        bonds_positions.append(position_instrument)
 
             result = Positions(
                 cash=PositionsCash(**asdict(positions.money[0])) if positions.money else None,

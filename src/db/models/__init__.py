@@ -8,4 +8,7 @@ from .task import Task, TaskResult
 from .users_broker import UsersBroker
 from .brokers_account import BrokersAccount
 from .stock_market_index import StockMarketsIndex
+from .index_composition import IndexComposition
+from .broker_instrument import BrokerInstrument
 from .users_strategy import UsersStrategy
+from .moex_bond import MoexBond

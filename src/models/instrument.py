@@ -8,7 +8,8 @@ class InstrumentBase:
     """
 
     uid: str
-    figi: str
+    # FIGI может отсутствовать (в справочнике БД храним NULL).
+    figi: str | None
     ticker: str
     lot_size: int
     isin: str | None

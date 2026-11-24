@@ -1,4 +1,5 @@
 from decimal import Decimal
+from typing import Annotated
 
 from pydantic import Field
 
@@ -7,21 +8,24 @@ from src.models.broker_names import BrokerNames
 
 # Комиссия в контракте — доля, а не проценты: 0.003 = 0,3 %.
 # lt=1 отсекает случай, когда клиент прислал проценты вместо доли.
-CommissionField = Field(ge=0, lt=1)
+CommissionFraction = Annotated[Decimal, Field(ge=0, lt=1)]
 
 
 class BrokerSettingsRequest(BaseApiModel):
     broker_name: BrokerNames
     token: str
-    sandbox: bool = False
+    # None — не менять: у нового брокера будет False (реальный режим),
+    # у существующего сохранится текущее значение. Явный флаг нужен только
+    # при смене режима; обновление токена режим не трогает.
+    sandbox: bool | None = None
     # None — не менять: у нового брокера останется значение по умолчанию (0.003),
     # у существующего — уже сохранённое.
-    commission: Decimal | None = Field(default=None, ge=0, lt=1)
+    commission: CommissionFraction | None = None
 
 
 class UpdateBrokerRequest(BaseApiModel):
     """Настройки брокера без секретов — правятся отдельно от токена."""
-    commission: Decimal = CommissionField
+    commission: CommissionFraction
 
 
 class BrokerSettingsResponse(BaseApiModel):

@@ -1,4 +1,4 @@
-from datetime import datetime
+from datetime import date, datetime
 
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
@@ -17,6 +17,17 @@ class StockMarketsIndex(Base):
     # Пропавшие из выдачи биржи индексы не удаляем (на них ссылаются стратегии),
     # а проставляем дату удаления. NULL — строка живая.
     deleted_at: Mapped[datetime | None] = mapped_column(nullable=True)
+    # Когда последний раз обновляли состав индекса (системная задача INDEX_SYNC).
+    # NULL — состав ещё ни разу не синкался.
+    composition_updated_at: Mapped[datetime | None] = mapped_column(nullable=True)
+    # Торговая дата, за которую взят текущий состав.
+    composition_tradedate: Mapped[date | None] = mapped_column(nullable=True)
+
+    compositions: Mapped[list["IndexComposition"]] = relationship(
+        "IndexComposition",
+        back_populates="index",
+        cascade="all, delete-orphan",
+    )
 
     users_strategy: Mapped["UsersStrategy"] = relationship(
         "UsersStrategy",

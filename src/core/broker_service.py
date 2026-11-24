@@ -52,7 +52,7 @@ class BrokerService:
         user,
         broker_name: BrokerNames,
         token: str,
-        sandbox: bool,
+        sandbox: bool | None = None,
         commission: Decimal | None = None,
     ) -> UsersBroker:
         """Сохранить настройки брокера пользователя.
@@ -62,13 +62,22 @@ class BrokerService:
         Токен шифруется здесь, до попадания в репозиторий/БД — в открытом виде
         он в хранилище не уходит.
 
+        sandbox=None — режим не меняем: у нового брокера будет False (реальный
+        режим), у существующего сохранится текущий. Обновление токена через UI
+        режим не трогает — иначе песочный брокер молча превращался бы в боевой.
         commission=None — комиссию не меняем: у нового брокера останется значение
         по умолчанию, у существующего — то, что уже сохранено.
         """
         if commission is not None:
             _validate_commission(commission)
 
-        client = self.broker_client_factory(token=token, sandbox=sandbox)
+        if sandbox is not None:
+            effective_sandbox = sandbox
+        else:
+            existing = await self.broker_repo.get_by_user_and_name(user.id, broker_name)
+            effective_sandbox = existing.sandbox if existing is not None else False
+
+        client = self.broker_client_factory(token=token, sandbox=effective_sandbox)
         # Запрос к брокеру синхронный (блокирующий gRPC) — уводим в threadpool.
         # Бросает BrokerAuthError, если токен недействителен.
         await run_in_threadpool(client.get_all_accounts)
@@ -78,7 +87,7 @@ class BrokerService:
             user_id=user.id,
             broker_name=broker_name,
             encrypted_token=encrypted_token,
-            sandbox=sandbox,
+            sandbox=effective_sandbox,
             commission=commission,
         )
 

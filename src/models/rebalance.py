@@ -1,8 +1,12 @@
-from pydantic import BaseModel
-from typing import List
+from pydantic import BaseModel, Field
+from typing import Annotated, List, Literal
 
 from src.models.action import Action
 from src.models.api_base import BaseApiModel
+
+# Единый словарь типов действий для плана и результата.
+ActionType = Literal["BUY", "SELL"]
+PositiveLots = Annotated[int, Field(gt=0)]
 
 
 class PortfolioPosition(BaseApiModel):
@@ -17,9 +21,19 @@ class PortfolioPosition(BaseApiModel):
 
 class RebalanceActionResult(BaseApiModel):
     """Успешно исполненное действие балансировки в API-ответе."""
-    type: str
+    type: ActionType
     ticker: str | None = None
     quantity: int
+
+
+class PlannedAction(BaseApiModel):
+    """Действие из готового плана клиента: исполнить как есть, без пересчёта.
+
+    quantity — лоты (как PostOrderRequest.quantity у брокера).
+    """
+    type: ActionType
+    ticker: str
+    quantity: PositiveLots
 
 
 class RebalanceErrorResult(BaseApiModel):
@@ -45,6 +59,8 @@ class RebalancePreviewResponse(BaseApiModel):
     free_cash: float
     free_cash_after: float
     actions: List[RebalanceActionResult]
+    # Торговая дата, за которую взят состав индекса. None — состав неизвестен.
+    index_date: str | None = None
 
 
 class RebalancePreview(BaseModel):
@@ -55,6 +71,8 @@ class RebalancePreview(BaseModel):
     free_cash: float
 
     positions: List[PortfolioPosition]
+    # Торговая дата состава индекса, по которому считали.
+    index_date: str | None = None
 
 
 

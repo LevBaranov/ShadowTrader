@@ -2,6 +2,8 @@ from fastapi import Depends
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from src.core.portfolio_manager import PortfolioManager
+from src.core.index_sync_service import IndexSyncService
+from src.core.instrument_service import InstrumentService
 from src.db.database import get_session
 from src.db.repositories.brokers_account_repository import BrokersAccountRepository
 from src.db.repositories.stock_markets_index_repository import StockMarketsIndexRepository
@@ -15,7 +17,12 @@ def get_strategy_service(
     session: AsyncSession = Depends(get_session)
 ) -> UserService:
 
-    return UserService(UsersStrategyRepository(session), PortfolioManager)
+    return UserService(
+        UsersStrategyRepository(session),
+        PortfolioManager,
+        IndexSyncService(),
+        InstrumentService(),
+    )
 
 
 def get_strategy_manager(

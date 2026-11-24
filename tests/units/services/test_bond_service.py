@@ -11,6 +11,8 @@ from src.models.bond import BondEvent, BondEventType
 
 
 class FakeAccountRepo:
+    session = None
+
     def __init__(self, account=None, owner_id=None):
         self.account = account
         self.owner_id = owner_id
@@ -26,9 +28,27 @@ class FakeAccountRepo:
 class FakeManager:
     def __init__(self, bonds):
         self.bonds = bonds
+        self.broker = None
 
-    def get_bonds_with_events(self):
+    def get_bonds_with_events(self, account_id=None, since=None, directory=None, moex_bonds=None):
         return self.bonds
+
+
+class FakeInstrumentService:
+    async def ensure_directory(self, session, token, sandbox, must_contain=frozenset(), broker=None):
+        from src.models.instrument_directory import InstrumentDirectory
+        return InstrumentDirectory(sandbox=sandbox, updated_at=None)
+
+
+def make_account(owner_token="t.token"):
+    from src.core.crypto import encrypt_token
+    return SimpleNamespace(
+        id=uuid.uuid4(),
+        users_broker=SimpleNamespace(
+            broker_token=encrypt_token(owner_token),
+            sandbox=False,
+        ),
+    )
 
 
 @pytest.fixture
@@ -47,7 +67,11 @@ def bonds():
 
 
 def make_service(monkeypatch, account_repo, bonds):
-    service = BondService(accounts_repo=account_repo, portfolio_manager_factory=None)
+    service = BondService(
+        accounts_repo=account_repo,
+        portfolio_manager_factory=None,
+        instrument_service=FakeInstrumentService(),
+    )
     monkeypatch.setattr(
         "src.core.bond_service.build_portfolio_manager_for_account",
         lambda account, factory: FakeManager(bonds),
@@ -56,7 +80,7 @@ def make_service(monkeypatch, account_repo, bonds):
 
 
 def test_returns_bonds_for_own_account(user, bonds, monkeypatch):
-    account = SimpleNamespace(id=uuid.uuid4())
+    account = make_account()
     repo = FakeAccountRepo(account, owner_id=user.id)
     service = make_service(monkeypatch, repo, bonds)
 
@@ -86,7 +110,8 @@ def test_unknown_account_raises(user, bonds, monkeypatch):
 
 def test_any_account_is_allowed_without_strategy(user, bonds, monkeypatch):
     """Проверка облигаций не требует стратегии на счёте."""
-    account = SimpleNamespace(id=uuid.uuid4(), users_strategy=None)
+    account = make_account()
+    account.users_strategy = None
     repo = FakeAccountRepo(account, owner_id=user.id)
     service = make_service(monkeypatch, repo, bonds)
 
