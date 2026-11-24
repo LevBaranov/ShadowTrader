@@ -280,3 +280,51 @@ def test_list_returns_only_active(service, user):
 
     assert len(tasks) == 1
     assert tasks[0].task_type == TaskType.BOND_EVENTS_MONITOR
+
+
+class TestSystemTasksHidden:
+    """NOTIFY_START_OFFER_DATE: создать через API нельзя, в списке не видна,
+    править/отменять по id нельзя (как будто нет)."""
+
+    def _system_task(self, repo, user):
+        task = SimpleNamespace(
+            id=uuid.uuid4(),
+            task_type=TaskType.NOTIFY_START_OFFER_DATE,
+            frequency=ScheduleFrequency.DAILY,
+            user_id=user.id,
+            params={"brokers_account_id": str(uuid.uuid4())},
+            last_checked_date=datetime.now(),
+            disabled_date=None,
+        )
+        repo.tasks.append(task)
+        return task
+
+    def test_create_system_task_rejected(self, service, user):
+        with pytest.raises(TaskValidationError):
+            asyncio.run(service.create_task(
+                user, "NOTIFY_START_OFFER_DATE", "DAILY",
+                {"brokers_account_id": str(uuid.uuid4())}
+            ))
+
+    def test_list_hides_system_tasks(self, service, repo, user):
+        asyncio.run(service.create_task(
+            user, "REBALANCE", "WEEKLY", {"strategy_id": str(uuid.uuid4())}
+        ))
+        self._system_task(repo, user)
+
+        tasks = asyncio.run(service.list_tasks(user))
+
+        assert len(tasks) == 1
+        assert tasks[0].task_type == TaskType.REBALANCE
+
+    def test_update_system_task_not_found(self, service, repo, user):
+        task = self._system_task(repo, user)
+
+        with pytest.raises(TaskNotFoundError):
+            asyncio.run(service.update_task(user, task.id, "WEEKLY", None))
+
+    def test_disable_system_task_not_found(self, service, repo, user):
+        task = self._system_task(repo, user)
+
+        with pytest.raises(TaskNotFoundError):
+            asyncio.run(service.disable_task(user, task.id))

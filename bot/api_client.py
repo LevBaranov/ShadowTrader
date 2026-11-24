@@ -139,10 +139,17 @@ class ShadowTraderApi:
             "GET", f"/strategies/{strategy_id}/rebalance", telegram_id
         )
 
-    async def execute_rebalance(self, telegram_id: int, strategy_id: str) -> dict:
+    async def execute_rebalance(
+        self, telegram_id: int, strategy_id: str, actions: list | None = None
+    ) -> dict:
+        """Исполнить балансировку. С actions — готовый план без пересчёта,
+        без — legacy-путь (сервер пересчитает сам)."""
+        body = {"strategyId": strategy_id}
+        if actions is not None:
+            body["actions"] = actions
         return await self._request(
             "POST", "/portfolios/balance", telegram_id,
-            json={"strategyId": strategy_id},
+            json=body,
         )
 
     async def create_strategy(

@@ -410,7 +410,7 @@ class TestBalance:
         )
 
         response = client.post(
-            "/portfolios/balance", json={"strategyId": strategy_id}
+            "/portfolios/balance", json={"strategyId": strategy_id, "actions": []}
         )
 
         assert response.status_code == 200
@@ -421,7 +421,7 @@ class TestBalance:
         assert body["errors"][0]["description"] == "Недостаточно активов"
 
         user_service.execute_strategy_rebalance.assert_awaited_once_with(
-            fake_user, strategy_id
+            fake_user, strategy_id, actions=[]
         )
 
     def test_accepts_snake_case_body(self, client, user_service):
@@ -430,7 +430,8 @@ class TestBalance:
         )
 
         response = client.post(
-            "/portfolios/balance", json={"strategy_id": str(uuid.uuid4())}
+            "/portfolios/balance",
+            json={"strategy_id": str(uuid.uuid4()), "actions": []},
         )
 
         assert response.status_code == 200
@@ -441,7 +442,8 @@ class TestBalance:
         )
 
         response = client.post(
-            "/portfolios/balance", json={"strategyId": str(uuid.uuid4())}
+            "/portfolios/balance",
+            json={"strategyId": str(uuid.uuid4()), "actions": []},
         )
 
         assert response.status_code == 404
@@ -452,7 +454,8 @@ class TestBalance:
         )
 
         response = client.post(
-            "/portfolios/balance", json={"strategyId": str(uuid.uuid4())}
+            "/portfolios/balance",
+            json={"strategyId": str(uuid.uuid4()), "actions": []},
         )
 
         assert response.status_code == 422
@@ -460,6 +463,45 @@ class TestBalance:
 
     def test_body_required(self, client):
         response = client.post("/portfolios/balance", json={})
+
+        assert response.status_code == 422
+
+    def test_planned_actions_passed_through(self, client, user_service, fake_user):
+        from src.models.rebalance import PlannedAction, RebalanceResult
+
+        strategy_id = str(uuid.uuid4())
+        user_service.execute_strategy_rebalance = AsyncMock(
+            return_value=RebalanceResult(success=[], errors=[])
+        )
+
+        response = client.post(
+            "/portfolios/balance",
+            json={
+                "strategyId": strategy_id,
+                "actions": [
+                    {"type": "BUY", "ticker": "SBER", "quantity": 2},
+                    {"type": "SELL", "ticker": "GAZP", "quantity": 1},
+                ],
+            },
+        )
+
+        assert response.status_code == 200
+        _, kwargs = user_service.execute_strategy_rebalance.await_args
+        assert kwargs["actions"] == [
+            PlannedAction(type="BUY", ticker="SBER", quantity=2),
+            PlannedAction(type="SELL", ticker="GAZP", quantity=1),
+        ]
+
+    @pytest.mark.parametrize("actions", [
+        [{"type": "BUY", "ticker": "SBER", "quantity": 0}],
+        [{"type": "HOLD", "ticker": "SBER", "quantity": 1}],
+        [{"type": "BUY", "quantity": 1}],
+    ])
+    def test_invalid_planned_actions_rejected(self, client, actions):
+        response = client.post(
+            "/portfolios/balance",
+            json={"strategyId": str(uuid.uuid4()), "actions": actions},
+        )
 
         assert response.status_code == 422
 
@@ -488,7 +530,9 @@ class TestSaveBroker:
             user=fake_user,
             broker_name=BrokerNames.T_BANK,
             token="t.token",
-            sandbox=False,
+            # Флаг не передан — бэкенд сам решит: новому боевой режим,
+            # существующему сохранит текущий.
+            sandbox=None,
             commission=None,
         )
 

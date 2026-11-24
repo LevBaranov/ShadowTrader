@@ -27,12 +27,15 @@ RUN pip install --no-cache-dir -r requirements.txt
 
 # httpx и подобные по умолчанию берут CA из пакета certifi, который ставится
 # вместе с зависимостями, поэтому добавляем CA Минцифры в его бандл уже
-# после установки зависимостей. Следом проверяем TLS к индексу Т-Банка:
-# слой упадёт с понятной ошибкой, если с сертификатами что-то не так.
+# после установки зависимостей. Проверка — офлайн: бандл должен грузиться
+# в SSL-контекст (ловит битую склейку PEM) и содержать наши сертификаты.
+# Сетевой smoke-тест к индексу Т-Банка здесь не делаем: хост отвечает
+# медленно/нестабильно из CI-раннеров, а успешный pip install выше —
+# уже достаточное доказательство рабочего TLS.
 RUN { echo; cat /usr/local/share/ca-certificates/russian-trusted-root-ca.crt \
         /usr/local/share/ca-certificates/russian-trusted-sub-ca.crt; } \
     >> "$(python -c 'import certifi; print(certifi.where())')" \
-    && python -c "import certifi, ssl, urllib.request; ctx = ssl.create_default_context(cafile=certifi.where()); print(urllib.request.urlopen(urllib.request.Request('https://opensource.tbank.ru/api/v4/projects/238/packages/pypi/simple/t-tech-investments/', headers={'User-Agent': 'docker-build-check'}), context=ctx, timeout=30).status)"
+    && python -c "import certifi, ssl; bundle = open(certifi.where(), 'rb').read(); ssl.create_default_context(cafile=certifi.where()); assert open('/usr/local/share/ca-certificates/russian-trusted-root-ca.crt', 'rb').read().strip() in bundle and open('/usr/local/share/ca-certificates/russian-trusted-sub-ca.crt', 'rb').read().strip() in bundle; print('certifi bundle OK, MinCifry CAs present')"
 
 COPY . .
 

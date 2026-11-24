@@ -5,6 +5,7 @@ from sqlalchemy import select, delete
 from sqlalchemy.ext.asyncio import AsyncSession
 from typing import Iterable, List, Optional, Set
 
+from src.db.models.stock_market_index import StockMarketsIndex
 from src.db.models.users_strategy import UsersStrategy
 from src.models.strategies_type import StrategiesType
 
@@ -53,6 +54,24 @@ class UsersStrategyRepository:
             )
         )
         return set(result.scalars().all())
+
+    async def get_referenced_indices(self) -> list[tuple[uuid.UUID, str]]:
+        """Индексы, на которые есть стратегии (живые, не помеченные удалёнными).
+
+        По ним ежедневный синк обновляет составы. Возвращаем плоские (id, name):
+        rollback в replace() инвалидирует ORM-объекты сессии, и обращение к
+        index_row.index_name после него падало бы MissingGreenlet.
+        """
+        result = await self.session.execute(
+            select(StockMarketsIndex.id, StockMarketsIndex.index_name)
+            .join(
+                UsersStrategy,
+                UsersStrategy.stock_markets_index_id == StockMarketsIndex.id,
+            )
+            .where(StockMarketsIndex.deleted_at.is_(None))
+            .distinct()
+        )
+        return [(row.id, row.index_name) for row in result.all()]
 
     async def create(
         self,

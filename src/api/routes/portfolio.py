@@ -17,7 +17,7 @@ async def exec_balance(
 ):
     try:
         return await strategy_service.execute_strategy_rebalance(
-            current_user, body.strategy_id
+            current_user, body.strategy_id, actions=body.actions
         )
     except StrategyNotFoundError:
         raise HTTPException(status_code=404, detail="Strategy not found")

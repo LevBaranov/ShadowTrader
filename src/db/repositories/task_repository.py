@@ -3,6 +3,7 @@ from datetime import datetime
 from sqlalchemy import cast, select, Integer, Boolean
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from src.core.verification import utcnow
 from src.db.enums import TaskType
 from src.db.models.task import Task, TaskResult
 from src.db.models.user import User
@@ -19,26 +20,48 @@ class TaskRepository:
 
         return list(result)
 
+    async def get_active_tasks_by_type(self, task_type: TaskType) -> list[Task]:
+        stmt = (select(Task)
+                .where(Task.task_type == task_type)
+                .where(Task.disabled_date.is_(None)))
+        result = await self.db.scalars(stmt)
+        return list(result)
+
     async def get_task(self, task_id: uuid.UUID) -> Task | None:
         stmt = select(Task).where(Task.id == task_id)
         result = await self.db.scalar(stmt)
         return result
 
+    async def get_active_system_task(self, task_type: TaskType) -> Task | None:
+        """Активная системная задача типа (без владельца)."""
+        stmt = (
+            select(Task)
+            .where(Task.task_type == task_type)
+            .where(Task.user_id.is_(None))
+            .where(Task.disabled_date.is_(None))
+        )
+        result = await self.db.scalar(stmt)
+        return result
 
     async def create_task(
             self,
             task_type: TaskType,
             frequency: ScheduleFrequency,
             user: User | None = None,
-            params: dict | None = None
+            params: dict | None = None,
+            last_checked_date: datetime | None = None,
     ) -> Task:
 
         task = Task(
             task_type=task_type,
             frequency=frequency,
             params=params,
-            user_id=user.id
+            user_id=user.id if user is not None else None,
         )
+        if last_checked_date is not None:
+            # Системным задачам можно задать дату в прошлом, чтобы первый
+            # проход планировщика выполнил их сразу, а не через период.
+            task.last_checked_date = last_checked_date
 
         self.db.add(task)
         await self.db.commit()
@@ -58,8 +81,8 @@ class TaskRepository:
 
         task = await self.get_task(task_id)
         if not errors:
-            task.last_checked_date = datetime.now()
-        task.updated_at = datetime.now()
+            task.last_checked_date = utcnow()
+        task.updated_at = utcnow()
 
         await self.db.commit()
 
@@ -98,7 +121,7 @@ class TaskRepository:
         if params is not None:
             task.params = params
 
-        task.updated_at = datetime.now()
+        task.updated_at = utcnow()
 
         await self.db.commit()
         await self.db.refresh(task)
@@ -108,8 +131,8 @@ class TaskRepository:
     async def disable_task(self, task_id: uuid.UUID) -> Task:
 
         task = await self.get_task(task_id)
-        task.disabled_date = datetime.now()
-        task.updated_at = datetime.now()
+        task.disabled_date = utcnow()
+        task.updated_at = utcnow()
 
         await self.db.commit()
         await self.db.refresh(task)

@@ -14,6 +14,7 @@ from src.db.models.brokers_account import BrokersAccount
 from src.db.models.stock_market_index import StockMarketsIndex
 from src.db.models.users_broker import UsersBroker
 from src.db.models.users_strategy import UsersStrategy
+from src.db.models.moex_bond import MoexBond
 
 # this is the Alembic Config object, which provides
 # access to the values within the .ini file in use.

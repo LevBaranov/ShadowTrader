@@ -30,3 +30,18 @@ class BalancerParams:
             min_lots_to_keep=strategy.min_lots_to_keep,
             max_cash=strategy.max_cash,
         )
+
+    @classmethod
+    def from_snapshot(cls, snapshot) -> "BalancerParams":
+        """Собрать параметры по плоскому снимку стратегии.
+
+        Снимок снимается до любых commit/rollback в той же сессии: после
+        rollback ORM-атрибуты expired и синхронный доступ к ним в async
+        падает MissingGreenlet. Поэтому горячий путь использует только снимок.
+        """
+        return cls(
+            delta=snapshot.delta,
+            commission=snapshot.commission,
+            min_lots_to_keep=snapshot.min_lots_to_keep,
+            max_cash=snapshot.max_cash,
+        )

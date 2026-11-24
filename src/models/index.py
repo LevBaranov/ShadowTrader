@@ -1,17 +1,17 @@
 from dataclasses import dataclass, field, asdict
 import pandas as pd
 
-@dataclass()
+@dataclass
 class IndexItem:
 
     ticker: str
-    shortnames: str
+    shortname: str
     weight: float
     lot_size: int
     isin: str
     last_price: float
 
-@dataclass()
+@dataclass
 class Index:
 
     name: str

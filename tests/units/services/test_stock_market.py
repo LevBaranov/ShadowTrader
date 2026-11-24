@@ -90,7 +90,7 @@ class TestLoadIndexData:
         moex = Moex()
 
         # Act
-        result = moex._load_index_data("IMOEX")
+        result = moex.load_index_rows("IMOEX")
 
         # Assert
         expected_data = expected.get("data", [])

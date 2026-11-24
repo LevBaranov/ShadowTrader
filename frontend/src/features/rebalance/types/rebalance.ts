@@ -5,7 +5,8 @@ export type Asset = {
   indexWeight: number;
   portfolioWeight: number;
   portfolioCount: number;
-  offer: number;
+  // Может прийти null с бэкенда (PortfolioPosition.offer: int|None).
+  offer: number | null;
 };
 export type Action = {
   type: "BUY" | "SELL";

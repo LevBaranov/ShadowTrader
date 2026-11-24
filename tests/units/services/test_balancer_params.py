@@ -20,7 +20,7 @@ def make_index(*items) -> Index:
         items=[
             IndexItem(
                 ticker=ticker,
-                shortnames=ticker,
+                shortname=ticker,
                 weight=weight,
                 lot_size=1,
                 isin=f"RU{ticker}",

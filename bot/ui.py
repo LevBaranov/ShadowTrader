@@ -24,6 +24,7 @@ from bot.utils import (
 
 BOND_EVENT_LABELS = {
     "OFFER": "оферта",
+    "OFFER_START": "подача заявок на оферту",
     "CALL_OPTION": "колл-опцион",
 }
 

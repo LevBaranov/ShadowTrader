@@ -19,7 +19,7 @@ class PositionsInstrument:
     Дата класс, описывающий позицию по финансовому инструменту
     """
     uid: str
-    figi: str
+    figi: str | None
     balance: int
     last_price: Cash
     lot_size: int

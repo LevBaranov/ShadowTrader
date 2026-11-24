@@ -5,6 +5,7 @@ from aiogram.fsm.context import FSMContext
 from aiogram.types import CallbackQuery, Message, ReplyKeyboardRemove
 
 from bot import texts, ui, views
+from bot import rebalance_plan
 from bot.api_client import ShadowTraderApi, ApiError
 from bot.percent import fraction_to_percent, parse_percent
 from bot.utils import (
@@ -269,6 +270,7 @@ async def on_strategy(
         callback: CallbackQuery,
         callback_data: StrategyCb,
         api: ShadowTraderApi,
+        state: FSMContext,
 ):
     telegram_id = callback.from_user.id
     message = callback.message
@@ -299,6 +301,10 @@ async def on_strategy(
                 )
                 return
             raise
+        # Запоминаем показанное: исполнение возьмёт actions отсюда, без пересчёта.
+        await state.update_data(rebalance_plan=rebalance_plan.make_plan(
+            strategy_id, preview.get("actions") or [],
+        ))
         await message.answer(
             ui.format_preview(strategy, preview),
             reply_markup=ui.strategy_view_kb(strategy_id, schedule_task),
@@ -306,8 +312,31 @@ async def on_strategy(
         return
 
     if action == "exec":
+        stored = (await state.get_data()).get("rebalance_plan")
+        actions, reason = rebalance_plan.resolve_plan(stored, strategy_id)
+        if reason is not None:
+            await callback.answer()
+            tasks = await api.list_tasks(telegram_id)
+            schedule_task = views.find_task(
+                tasks, views.REBALANCE_TASK, strategy_id=strategy_id
+            )
+            await message.answer(
+                texts.PLAN_STALE,
+                reply_markup=ui.strategy_view_kb(strategy_id, schedule_task),
+            )
+            return
         await callback.answer("Выполняю…")
-        result = await api.execute_rebalance(telegram_id, strategy_id)
+        try:
+            result = await api.execute_rebalance(telegram_id, strategy_id, actions)
+        except ApiError as error:
+            if error.detail == "account_deleted":
+                await message.answer(
+                    "Счёт этой стратегии удалён у брокера — операции недоступны.",
+                    reply_markup=ui.strategy_view_kb(strategy_id, None),
+                )
+                return
+            raise
+        await state.update_data(rebalance_plan=None)
         await message.answer(ui.format_rebalance_result(result), reply_markup=ui.main_menu_kb())
         return
 

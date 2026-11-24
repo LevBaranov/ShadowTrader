@@ -67,11 +67,26 @@ export default function StrategyCard({
     sortConfig,
   ]);
   const actions: Action[] = buildRebalanceActions(assets);
+  // Снапшот «показанного»: диалог исполняет именно его, даже если strategy
+  // обновится при открытом диалоге. Как FSM-план в боте.
+  const [snapshot, setSnapshot] = useState<Action[] | null>(null);
+
+  const handleOpen = () => {
+    setSnapshot([...actions]);
+    setOpen(true);
+  };
 
   const handleExecute = async (): Promise<RebalanceExecutionResult> => {
-    const result = await executeRebalance(strategy.id);
+    // Исполняем ровно показанное в диалоге — сервер пересчёт не делает.
+    const result = await executeRebalance(strategy.id, snapshot ?? actions);
 
-    await onUpdated();
+    try {
+      await onUpdated();
+    } catch (error) {
+      // Балансировка уже прошла — ошибку обновления списка только логируем,
+      // диалог должен показать результат исполнения, а не её.
+      console.error("Не удалось обновить список стратегий:", error);
+    }
 
     return result;
   };
@@ -170,7 +185,7 @@ export default function StrategyCard({
                 actions.length === 0 ||
                 deleting
               }
-              onClick={() => setOpen(true)}
+              onClick={handleOpen}
             >
               Балансировка
             </Button>
@@ -263,7 +278,7 @@ export default function StrategyCard({
       <RebalanceDialog
         open={open}
         onClose={() => setOpen(false)}
-        actions={actions}
+        actions={snapshot ?? actions}
         onExecute={handleExecute}
       />
 

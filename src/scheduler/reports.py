@@ -1,4 +1,5 @@
 """Тексты отчётов планировщика для уведомлений пользователю."""
+from src.models.bond import BOND_EVENT_LABELS
 
 REPORT_HEAD = "Я тут немного «пошуршал», пока ты не видел.\n"
 
@@ -17,12 +18,6 @@ def rebalance_report(success_actions, error_actions) -> str:
             lines.append(f"При выполнении действия с {ticker} ошибка: {error.description}")
 
     return "\n".join(lines)
-
-
-BOND_EVENT_LABELS = {
-    "OFFER": "оферта",
-    "CALL_OPTION": "колл-опцион",
-}
 
 
 def bonds_report(bonds_with_events) -> str:
